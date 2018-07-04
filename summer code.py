@@ -33,6 +33,7 @@ from astropy import units as u
 import matplotlib.ticker as mticker
 import math
 
+
 '''
 --------------------------------------------------------------------
 '''
@@ -141,9 +142,11 @@ image_data2_new[:,:]=image_data2[min_y2pixels:max_y2pixels,
                                    min_x2pixels:max_x2pixels]
 
 #now we have 2 images showing the same patch of sky!
+subtraction=image_data1_new-image_data2_new
 '''
 --------------------------------------------------------------------
 '''
+
 #SECTION 3 - MAKE IMAGES SAME SIZE (PIXEL SIZE)
 
 
@@ -157,12 +160,18 @@ image_data2_new[:,:]=image_data2[min_y2pixels:max_y2pixels,
 '''
 #SECTION 4 - COMPARE PIXEL VALUES
 
-def convert(coords1y,coords1x,wcs2):
-    points_converted=system2.wcs_world2pix(coordsx,coordsy,1)
-    points2y,points2x=np.int_(points_converted[1]),np.int_(points_converted[0])
-    points_converted=(points2y,points2x)
-    return points_converted
-
+#take cropped coordinates
+#convert into image2 pixels 
+#create subtraction image 
+#def convert(coords1y,coords1x,system,system2):
+#    coords1=system.wcs_pix2world(coords1x,coords1y,1)
+#    coordsy,coordsx=coords1[1],coords1[0]
+#    points_converted=system2.wcs_world2pix(coordsx,coordsy,1)
+#    points2y,points2x=np.int_(points_converted[1]),np.int_(points_converted[0])
+#    points_converted=(points2y,points2x)
+#    return points_converted
+#
+#conv_cord=convert(points1y_crop,points1x_crop,wcs,wcs2)
 
 
 
