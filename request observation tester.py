@@ -112,6 +112,6 @@ userrequest_dict = response.json()  # The API will return the newly submitted us
 # Print out the url on the portal where we can view the submitted request
 print('View this observing request: https://observe.lco.global/userrequests/{}/'.format(userrequest_dict['id']))
 
-## Gets an update on request
-#requests.get('https://observe.lco.global/api/userrequests/{}/').json()
-
+# Gets an update on request
+request_info = requests.get('https://observe.lco.global/api/userrequests/{}/'.format(userrequest_dict['id'])).json()
+print(request_info.get('state'))
