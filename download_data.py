@@ -36,6 +36,8 @@ make a directory path to userdata.dat
 PATH='/Users/lewisprole/Documents/University/year3/summer_project'
 #FILENAME='userdata.dat'
 
+token = 'API TOKEN'
+
 def parse_args():
     """Parse command-line inputs"""
 
@@ -125,7 +127,7 @@ def download_frames(sdate, edate, headers, prop, datafolder):
     return nidentified, ndownloaded
 
 
-def get_headers_from_token(username, password):
+def get_headers_from_token(token):
     """
       This function gets an authentication token from the LCO archive.
       Args:
@@ -134,15 +136,15 @@ def get_headers_from_token(username, password):
       Returns:
           dict: LCO authentication token
     """
-    # Get LCOGT token:
-    response = requests.post('https://archive-api.lco.global/api-token-auth/',
-                             data={'username': username,
-                                   'password': password}
-                             ).json()
-
-    token = response.get('token')
-
-    # Store the Authorization header
+#    # Get LCOGT token:
+#    response = requests.post('https://archive-api.lco.global/api-token-auth/',
+#                             data={'username': username,
+#                                   'password': password}
+#                             ).json()
+#
+#    token = response.get('token')
+#
+#    # Store the Authorization header
     headers = {'Authorization': 'Token ' + token}
     return headers
 
