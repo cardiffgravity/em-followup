@@ -1,10 +1,11 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jul 13 09:58:09 2018
+Created on Tue Jul 17 10:02:19 2018
 
 @author: lewisprole
 """
+
 import os
 import time
 import sys
@@ -12,6 +13,7 @@ import argparse
 import calendar
 import requests
 import numpy as np
+
 
 '''
 lewis notes
@@ -33,32 +35,33 @@ set start date, ID, and directory
 
 make a directory path to userdata.dat
 '''
-PATH='/Users/lewisprole/Documents/University/year3/summer_project'
-#FILENAME='userdata.dat'
 
-token = 'API TOKEN'
 
-def parse_args():
-    """Parse command-line inputs"""
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-sdate', default=None,
-                        help='Start date for search [YYYY-MM-DD]')
-    parser.add_argument('-edate', default=None,
-                        help='End date for search. [YYYY-MM-DD]')
-    parser.add_argument('-proposalID', default=None,
-                        help='List of proposals to search for')
-    parser.add_argument('-datafolder', default=None,
-                        help='Directory where the data will be downloaded into.')
-    parser.add_argument('-flatdir', action='store_true',
-                        help='Use a flat directory structure instead of sorting into date subdirectories')
-    parser.add_argument('-spectra', action='store_true',
-                        help='Only download NRES spectral packages (ending w/ .tar.gz)')
-
-    args = parser.parse_args()
-
-    return args
-
+#def parse_args():
+#    """Parse command-line inputs"""
+#
+#    parser = argparse.ArgumentParser()
+#    parser.add_argument('-sdate', default=None,
+#                        help='Start date for search [YYYY-MM-DD]')
+#    parser.add_argument('-edate', default=None,
+#                        help='End date for search. [YYYY-MM-DD]')
+#    parser.add_argument('-proposalID', default=None,
+#                        help='List of proposals to search for')
+#    parser.add_argument('-datafolder', default=None,
+#                        help='Directory where the data will be downloaded into.')
+#    parser.add_argument('-flatdir', action='store_true',
+#                        help='Use a flat directory structure instead of sorting into date subdirectories')
+#    parser.add_argument('-spectra', action='store_true',
+#                        help='Only download NRES spectral packages (ending w/ .tar.gz)')
+#
+#    args = parser.parse_args()
+#
+#    return args
+sdate='2018-03-01'
+edate='2018-03-02'
+proposalID="FTPEPO2014A-004"
+PATH="/Users/lewisprole/Documents/University/year3/summer_project"
+datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
 
 def download_frames(sdate, edate, headers, prop, datafolder):
     """Download files
@@ -127,7 +130,7 @@ def download_frames(sdate, edate, headers, prop, datafolder):
     return nidentified, ndownloaded
 
 
-def get_headers_from_token(token):
+def get_headers_from_token(username, password):
     """
       This function gets an authentication token from the LCO archive.
       Args:
@@ -136,26 +139,26 @@ def get_headers_from_token(token):
       Returns:
           dict: LCO authentication token
     """
-#    # Get LCOGT token:
-#    response = requests.post('https://archive-api.lco.global/api-token-auth/',
-#                             data={'username': username,
-#                                   'password': password}
-#                             ).json()
-#
-#    token = response.get('token')
-#
-#    # Store the Authorization header
+    # Get LCOGT token:
+    response = requests.post('https://archive-api.lco.global/api-token-auth/',
+                             data={'username': username,
+                                   'password': password}
+                             ).json()
+
+    token = response.get('token')
+
+    # Store the Authorization header
     headers = {'Authorization': 'Token ' + token}
     return headers
 
 
 if __name__ == '__main__':
-    args = parse_args()
+#    args = parse_args()
 
-    starting_date = args.sdate
-    ending_date = args.edate
-    propID = args.proposalID
-    dfolder = args.datafolder
+    starting_date = sdate
+    ending_date = edate
+    propID = proposalID
+    dfolder = datafolder
 
     print('\n\t ----------------------------------------------')
     print('\t                lcogtDD v.1.2.\n')
