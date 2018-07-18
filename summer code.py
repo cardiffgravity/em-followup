@@ -108,21 +108,23 @@ def coords(data1,data2,system,system2):
 
 
 #function which takes new fits files and saves them as .png files
-def save_png(name,Vmin,Vmax,path_general,wcs,sub):
+def save_png(name,Vmin,Vmax,path_general,wcs,sub,title):
     if sub=='yes':
         fits_data = fits.getdata(path_general+'/subtraction/%s'%name)
         plt.subplot(projection=wcs)
-        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax, cmap='PuRd_r')
+        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax, cmap='PuRd_r',logNorm=True)
         plt.grid(color='white', ls='solid')
         plt.colorbar()
+        plt.title('%s'%title)
         imagename = name.replace('.fits', '.png')
         plt.savefig(path_general+'/subtraction/%s'%imagename)
     else:
         fits_data = fits.getdata(path_general+'/fits_images/%s'%name)
         plt.subplot(projection=wcs)
-        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax, cmap='PuRd_r')
+        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax, cmap='PuRd_r',logNorm=True)
         plt.grid(color='white', ls='solid')
         plt.colorbar()
+        plt.title('%s'%title)
         imagename = name.replace('.fits', '.png')
         plt.savefig(path_general+'/new_images/%s'%imagename)
         plt.close('all')
@@ -138,6 +140,7 @@ def save_png(name,Vmin,Vmax,path_general,wcs,sub):
 #so that both images have same format
 #save as fits images in folder 'fits_images'
 def CPR(path_general):
+    print('CPR')
     #for each file in 'images' folder, load data & wcs, get coordinates of pixels
     for filename in os.listdir(path_general+'/images'):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
@@ -152,8 +155,9 @@ def CPR(path_general):
             xrange2 = max(coordinates2[1])-min(coordinates2[1])
             yrange1 = max(coordinates1[0])-min(coordinates1[0])
             yrange2 = max(coordinates2[0])-min(coordinates2[0])
-            if xrange1>xrange2 : 
-                if  yrange1>yrange2:
+            
+            if xrange1>=xrange2 : 
+                if  yrange1>= yrange2:
                     new_image_data1, footprint = reproject_interp(hdu1, hdu2.header)
                     new_image_data2=image_data2 #reproject reformats image to same format
                     wcs=wcs2
@@ -168,7 +172,7 @@ def CPR(path_general):
                         wcs=wcs1
                         
             if xrange2>xrange1 :
-                if  yrange2>yrange1:
+                if  yrange2>=yrange1:
                     new_image_data2, footprint = reproject_interp(hdu2, hdu1.header)
                     new_image_data1=image_data1
                     wcs=wcs1
@@ -183,12 +187,27 @@ def CPR(path_general):
                         new_image_data1, footprint = reproject_interp(hdu1, hdu2.header)
                         new_image_data2=image_data2 #reproject reformats image to same format
                         wcs=wcs2
+                        
                     
                     
-                
+            if xrange2==xrange1:
+                if  yrange2>yrange1:
+                    new_image_data2, footprint = reproject_interp(hdu2, hdu1.header)
+                    new_image_data1=image_data1
+                    wcs=wcs1
+                else:
+                    if np.abs(xrange1-xrange2)>np.abs(yrange1-yrange2):
+                        new_image_data2, footprint = reproject_interp(hdu2, hdu1.header)
+                        new_image_data1=image_data1 #reproject reformats image to same format
+                        wcs=wcs1
+                        
             new_image_data1=ndimage.filters.gaussian_filter(new_image_data1,3)
             new_image_data2=ndimage.filters.gaussian_filter(new_image_data2,3)
             
+            
+            if os.path.exists(path_general+'/fits_images/%s_1.fits'%filename)==True:
+                os.remove(path_general+'/fits_images/%s_1.fits'%filename)
+                os.remove(path_general+'/fits_images/%s_2.fits'%filename)
             header=wcs.to_header()
             hdu = fits.PrimaryHDU(new_image_data1,header=header)
             hdul = fits.HDUList([hdu])
@@ -203,81 +222,118 @@ def CPR(path_general):
             
 #change brightness
 def bright_diff(path_general):
+    print('bright_diff')
     for filename in os.listdir(path_general+'/images'):
         print(filename)
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
         else:
             new_image_data1,new_image_data2,hdu1,hdu2,wcs1,wcs2=get_fitsimage(path_general,filename)
+            new_image_data1=ndimage.filters.gaussian_filter(new_image_data1,3)
+            new_image_data2=ndimage.filters.gaussian_filter(new_image_data2,3)
             
-            #blur images to remove noise 
-            d1=ndimage.filters.gaussian_filter(new_image_data1,3)
-            d2=ndimage.filters.gaussian_filter(new_image_data2,3)
+            pool1=new_image_data1[np.isfinite(new_image_data1)]
+            pool2=new_image_data2[np.isfinite(new_image_data1)]
             
-            
-            pool1=d1[np.isfinite(d1)]
-            pool2=d2[np.isfinite(d1)]
-            pool1=pool1[~np.isnan(pool1)]
             pool2=pool2[~np.isnan(pool1)]
+            pool1=pool1[~np.isnan(pool1)]
             
-            pool2=pool2[np.isfinite(pool2)]
             pool1=pool1[np.isfinite(pool2)]
-            pool2=pool2[~np.isnan(pool2)]
+            pool2=pool2[np.isfinite(pool2)]
+            
             pool1=pool1[~np.isnan(pool2)]
-   
+            pool2=pool2[~np.isnan(pool2)]
+            wholepool1=copy.deepcopy(pool1)
+            wholepool2=copy.deepcopy(pool2)
             
-            #calculate average ratio of pools 
-            av_diff=np.mean(pool1-pool2)
-            #optimise av_diff
-            diff_old=0
+            #want to isolate bright objects, limit pool to 50-80 percentiles 
+            
+#            l1,u1=np.percentile(pool1,[25,75])
+#            l2,u2=np.percentile(pool2,[25,75])
+#            
+#            pool1=pool1[np.where(pool1>l1)]
+#            pool2=pool2[np.where(pool1>l1)]
+#            
+#            pool1=pool1[np.where(pool1<u1)]    
+#            pool2=pool2[np.where(pool1<u1)]
+#            
+#            pool1=pool1[np.where(pool2>l2)]
+#            pool2=pool2[np.where(pool2>l2)]
+#                                 
+#            pool1=pool1[np.where(pool2<u2)]                  
+#            pool2=pool2[np.where(pool2<u2)] 
+            
+            
+            rms1=np.std(pool1)
+            mean1=np.mean(pool1)
+            rms2=np.std(pool2)
+            mean2=np.mean(pool2)
+            print(rms1,mean1,rms2,mean2)
+            
+            new_image_data1=new_image_data1-mean1
+            new_image_data1=new_image_data1/rms1
+            
+            new_image_data2=new_image_data2-mean2
+            new_image_data2=new_image_data2/rms2
+            
+            new_image_data1[np.where(new_image_data1)<0]=0
+            new_image_data2[np.where(new_image_data2)<0]=0
+            
+            
+#            ave_bright1=np.mean(pool1)
+#            ave_bright2=np.mean(pool2)
+#            diff=np.mean(ave_bright1-ave_bright2)
            
-            for i in range (5):
-                
-                pool2=pool2+av_diff
-                diff_old=diff_old+av_diff
-                control=av_diff
-                av_diff=np.mean(pool1-pool2)
-                print(filename,diff_old,av_diff)
-                if av_diff==0:
-                    break
-                if av_diff==control:
-                    break
-                #find average difference between images
-                 #add change
                 
             
+#            diff_accum = 0
+#            newpool=pool2
+#            
+#            for i in range (5):
+#                newpool += diff
+#                diff_accum += diff
+#                diff=np.mean(pool1-newpool)
+
+#            new_image_data2=new_image_data2+diff
             os.remove(path_general+'/fits_images/%s_2.fits'%filename) #remove old file
-            new_image_data2=new_image_data2+diff_old
+            os.remove(path_general+'/fits_images/%s_1.fits'%filename)
             wcs=wcs2
             header=wcs.to_header()
             hdu = fits.PrimaryHDU(new_image_data2,header=header) #write new file
             hdul = fits.HDUList([hdu])
             hdul.writeto(path_general+'/fits_images/%s_2.fits'%filename)
             
+            header=wcs.to_header()
+            hdu = fits.PrimaryHDU(new_image_data1,header=header) #write new file
+            hdul = fits.HDUList([hdu])
+            hdul.writeto(path_general+'/fits_images/%s_1.fits'%filename)
             
             
 #function to make subtraction images 
 def sub(path_general):
-        for filename in os.listdir(path_general+'/images'):
-            if filename=='.DS_Store': #problematic folder that shows up sometimes
-                print('.')
-            else:
-                new_image_data1,new_image_data2,hdu1,hdu2,wcs1,wcs2=get_fitsimage(path_general,filename)
-                
-                subtraction=np.absolute(new_image_data1-new_image_data2)
-                subtraction[~np.isfinite(subtraction)]=0
+    print('sub')
+    for filename in os.listdir(path_general+'/images'):
+        if filename=='.DS_Store': #problematic folder that shows up sometimes
+            print('.')
+        else:
+            new_image_data1,new_image_data2,hdu1,hdu2,wcs1,wcs2=get_fitsimage(path_general,filename)
+            print(filename)
+            subtraction=np.absolute(new_image_data1-new_image_data2)
+#            subtraction[~np.isfinite(subtraction)]=0
+#            subtraction[np.where(subtraction<20)]=0
 #                subtraction=ndimage.filters.gaussian_filter(subtraction,3)
 #                mask=np.zeros_like(subtraction)
 #                mask[subtraction>np.percentile(subtraction,75)]=1
-                #subtraction=ndimage.filters.gaussian_filter(subtraction,3)
-                hdu = fits.PrimaryHDU(subtraction) #write new file
-                hdul = fits.HDUList([hdu])
-                hdul.writeto(path_general+'/subtraction/%s_sub.fits'%filename)
+            #subtraction=ndimage.filters.gaussian_filter(subtraction,3)
+            hdu = fits.PrimaryHDU(subtraction) #write new file
+            hdul = fits.HDUList([hdu])
+            hdul.writeto(path_general+'/subtraction/%s_sub.fits'%filename)
             
 #loads files from 'fits_images'
 #plots fits images and selects sensible limits 
 #saves image as a png file into 'new_images' file 
 def out_save(path_general,subtraction):
+    print('out_save')
     for filename in os.listdir(path_general+'/images'):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
@@ -287,30 +343,37 @@ def out_save(path_general,subtraction):
             #pool of real data (no NaNs)
             pool1=new_image_data1[np.isfinite(new_image_data1)]
             pool1=pool1[~np.isnan(pool1)]
-            min1,max1=np.percentile(pool1,[75,95])
+            min1,max1=np.percentile(pool1,[50,95])
             
             
             pool2=new_image_data2[np.isfinite(new_image_data2)]
             pool2=pool2[~np.isnan(pool2)]
-            min2,max2=np.percentile(pool2,[75,95])
+#            min2,max2=np.percentile(pool2,[50,95])
+            max2,min2=max(pool2),min(pool2)
+            max1,min1=max(pool1),min(pool1)
             
             if subtraction=='yes':
                 path=path_general+'/subtraction/%s_sub.fits'%(filename)
                 hdu_list=fits.open(path)
                 hdu = fits.open(path)[0]
                 subs=hdu.data
+                
                 hdu_list.close()
                 pools=subs[np.isfinite(subs)]
                 pools=pools[~np.isnan(pools)]
-                mins,maxs=np.percentile(pools,[50,90])
-                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes')
+                mins,maxs=np.percentile(pools,[50,95])
+                mins,maxs=0.5,2
+                mins,maxs=min(pools),max(pools)
+                print(mins,maxs)
+                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes',filename)
                 os.remove(path_general+'/subtraction/%s_sub.fits'%filename)
             
-            save_png('%s_1.fits'%filename,min1,max1,path_general,wcs1,'no')
+            plt.close('all')
+            save_png('%s_1.fits'%filename,min1,max1,path_general,wcs1,'no',max(pools))
             os.remove(path_general+'/fits_images/%s_1.fits'%filename)
             plt.close('all')
             
-            save_png('%s_2.fits'%filename,min2,max2,path_general,wcs2,'no')
+            save_png('%s_2.fits'%filename,min2,max2,path_general,wcs2,'no',max(pools))
             os.remove(path_general+'/fits_images/%s_2.fits'%filename)
             plt.close('all')
             
