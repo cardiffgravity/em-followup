@@ -39,22 +39,30 @@ import os
 
 '''
 --------------------------------------------------------------------
+
+REQUIREMENTS
+2 comparison images of single target
+within a folder named e.g. 'keyword'
+images must have same name keyword as folder i.e. 'keyword_1', 'keyword_2'
+'keyword' folder saved in folder named 'images'
+also, create 'new_images' & 'fits_images' folders at same level as 'images' folder
+make sure 'new_images' & 'fits_images' folders are empty to begin 
+
+
+path_images is the directory to 'images' folder 
+getimage function opens one 'keyword' folder in 'images'
+extracts fitsheader of the 2 comparison images  inside
+extracts word coordinate system (wcs)
+
+to use: example
+path_general='/Users/lewisprole/Documents/University/year3/summer_project'
+CPR(path_general)
+bright_diff(path_general)
+sub(path_general)
+out_save(path_general,'yes')
+
+--------------------------------------------------------------------
 '''
-
-#SECTION 1 - LOAD IN IMAGES AND EXTRACT COORDINATES
-#REQUIREMENTS
-#2 comparison images of single target
-#within a folder named e.g. 'keyword'
-#images must have same name keyword as folder i.e. 'keyword_1', 'keyword_2'
-#'keyword' folder saved in folder named 'images'
-#also, create 'new_images' & 'fits_images' folders at same level as 'images' folder
-#make sure 'new_images' & 'fits_images' folders are empty to begin 
-
-
-#path_images is the directory to 'images' folder 
-#getimage function opens one 'keyword' folder in 'images'
-#extracts fitsheader of the 2 comparison images  inside
-#extracts word coordinate system (wcs)
 
 def getimage(path_general,keyword):
 
@@ -224,7 +232,7 @@ def CPR(path_general):
 def bright_diff(path_general):
     print('bright_diff')
     for filename in os.listdir(path_general+'/images'):
-        print(filename)
+        
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
         else:
@@ -268,7 +276,8 @@ def bright_diff(path_general):
             mean1=np.mean(pool1)
             rms2=np.std(pool2)
             mean2=np.mean(pool2)
-            print(rms1,mean1,rms2,mean2)
+            
+        
             
             new_image_data1=new_image_data1/mean1
 #            new_image_data1=new_image_data1/rms1
@@ -317,7 +326,7 @@ def sub(path_general):
             print('.')
         else:
             new_image_data1,new_image_data2,hdu1,hdu2,wcs1,wcs2=get_fitsimage(path_general,filename)
-            print(filename)
+            
             subtraction=np.absolute(new_image_data1-new_image_data2)
 #            subtraction[~np.isfinite(subtraction)]=0
             subtraction[np.where(subtraction <= 0)]=0.00001
@@ -367,7 +376,6 @@ def out_save(path_general,subtraction):
                 mins,maxs=np.percentile(pools,[50,95])
                 mins,maxs=0.5,2
                 mins,maxs=1,max(pools)
-                print(mins,maxs)
                 save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes',filename)
                 os.remove(path_general+'/subtraction/%s_sub.fits'%filename)
             
@@ -383,14 +391,7 @@ def out_save(path_general,subtraction):
             
 
 
-#path_images='/Users/lewisprole/Documents/University/year3/summer_project/images'
-#path_fits='/Users/lewisprole/Documents/University/year3/summer_project/fits_images'
-#path_new='/Users/lewisprole/Documents/University/year3/summer_project/new_images'
-path_general='/Users/lewisprole/Documents/University/year3/summer_project'
-CPR(path_general)
-bright_diff(path_general)
-sub(path_general)
-out_save(path_general,'yes')
+
 
 
 
