@@ -10,6 +10,7 @@ from datetime import timedelta
 import astropy.units as u
 import astropy.coordinates as coord
 from astroquery.simbad import Simbad
+import os
 
 class Request():
     
@@ -164,3 +165,16 @@ userrequest_dict = response.json()  # The API will return the newly submitted us
 # Print out the url on the portal where we can view the submitted request
 print('View this observing request: https://observe.lco.global/userrequests/{}/'.format(userrequest_dict['id']))
 
+#function to add targets to a .txt file
+#or create new file if none exist
+path_to_file='/Users/lewisprole/Documents/GitHub/em-followup'
+def txtfile(path_to_file,RA,Dec):
+    if os.path.exists(path_to_file+'/target_list.txt')==False:
+        f= open("target_list.txt","w+")
+        f.write('name expt filter RA Dec\n')
+    else:
+        f= open("target_list.txt","a+")
+    name=instance.coord_to_name(RA,Dec)       
+    f.write('%s 30 v %s %s \n'%(name,RA,Dec))
+    f.close()
+    
