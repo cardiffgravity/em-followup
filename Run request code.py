@@ -14,8 +14,8 @@ from Request_LCO import *
 #RUN THE CODE
 
 
-username= "tillyevans"
-password = "newpasswordforLewis"
+username= "username"
+password = "password"
 RA = 202.4708
 Dec = 47.1953
 PROPOSAL_ID = "LCOEPO2018A-004"
@@ -23,12 +23,12 @@ magnitude = 9
 expt=30
 
 
-instance = Request(RA, Dec,magnitude,PROPOSAL_ID,username,password)
+userrequest = Request(RA, Dec,magnitude,PROPOSAL_ID,username,password)
 
 response = requests.post(
     'https://observe.lco.global/api/userrequests/',
-    headers=instance.retrieve_token(username, password),
-    json=instance.final_for_submission(RA,Dec,magnitude,PROPOSAL_ID)  
+    headers = userrequest.retrieve_token(username, password),
+    json = userrequest.final_for_submission(RA, Dec, magnitude, PROPOSAL_ID)  
 )
 
 try:
@@ -45,15 +45,15 @@ print('View this observing request: https://observe.lco.global/userrequests/{}/'
 
 #function to add targets to a .txt file
 #or create new file if none exist
-path_to_file='/Users/lewisprole/Documents/GitHub/em-followup'
+path_to_file = '/Users/lewisprole/Documents/GitHub/em-followup'
 def txtfile(path_to_file,RA,Dec):
     if os.path.exists(path_to_file+'/target_list.txt')==False:
-        f= open("target_list.txt","w+")
+        f = open("target_list.txt","w+")
         f.write('name expt filter RA Dec\n')
     else:
-        f= open("target_list.txt","a+")
-    name=instance.coord_to_name(RA,Dec)       
-    f.write('%s %f v %s %s \n'%(name,expt,RA,Dec))
+        f = open("target_list.txt","a+")
+    name = userrequest.coord_to_name(RA, Dec)       
+    f.write('%s %f v %s %s \n'%(name, expt, RA, Dec))
     f.close()
     pass
 
