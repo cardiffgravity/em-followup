@@ -64,6 +64,10 @@ out_save(path_general,'yes')
 --------------------------------------------------------------------
 '''
 
+
+
+
+
 def getimage(path_general,keyword):
 
     path=path_general+'/images/%s/%s_1.fits'%(keyword,keyword)
@@ -120,7 +124,8 @@ def save_png(name,Vmin,Vmax,path_general,wcs,sub,title):
     if sub=='yes':
         fits_data = fits.getdata(path_general+'/subtraction/%s'%name)
         plt.subplot(projection=wcs)
-        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,norm=LogNorm())
+        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax)
+#       norm=LogNorm()
         plt.grid(color='white', ls='solid')
         plt.colorbar()
         plt.title('%s'%title)
@@ -129,7 +134,7 @@ def save_png(name,Vmin,Vmax,path_general,wcs,sub,title):
     else:
         fits_data = fits.getdata(path_general+'/fits_images/%s'%name)
         plt.subplot(projection=wcs)
-        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,norm=LogNorm())
+        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax)
         plt.grid(color='white', ls='solid')
         plt.colorbar()
         plt.title('%s'%title)
@@ -197,7 +202,7 @@ def CPR(path_general):
                         wcs=wcs2
                         
                     
-                    
+            
             if xrange2==xrange1:
                 if  yrange2>yrange1:
                     new_image_data2, footprint = reproject_interp(hdu2, hdu1.header)
@@ -253,36 +258,46 @@ def bright_diff(path_general):
             pool2=pool2[~np.isnan(pool2)]
             wholepool1=copy.deepcopy(pool1)
             wholepool2=copy.deepcopy(pool2)
+            f, (ax1, ax2) = plt.subplots(1, 2, sharey=False)
+#            ax1.plot(wholepool1)
+#            ax1.plot(wholepool2,alpha=0.5)
             
             #want to isolate bright objects, limit pool to 50-80 percentiles 
             
-#            l1,u1=np.percentile(pool1,[25,75])
-#            l2,u2=np.percentile(pool2,[25,75])
-#            
-#            pool1=pool1[np.where(pool1>l1)]
-#            pool2=pool2[np.where(pool1>l1)]
-#            
-#            pool1=pool1[np.where(pool1<u1)]    
-#            pool2=pool2[np.where(pool1<u1)]
-#            
-#            pool1=pool1[np.where(pool2>l2)]
-#            pool2=pool2[np.where(pool2>l2)]
-#                                 
-#            pool1=pool1[np.where(pool2<u2)]                  
-#            pool2=pool2[np.where(pool2<u2)] 
+            l1,u1=np.percentile(pool1,[10,50])
+            l2,u2=np.percentile(pool2,[10,50])
             
+            pool1=pool1[np.where(pool1>l1)]
+            pool2=pool2[np.where(pool1>l1)]
             
-            rms1=np.std(pool1)
-            mean1=np.mean(pool1)
-            rms2=np.std(pool2)
-            mean2=np.mean(pool2)
+            pool1=pool1[np.where(pool1<u1)]    
+            pool2=pool2[np.where(pool1<u1)]
             
+            pool1=pool1[np.where(pool2>l2)]
+            pool2=pool2[np.where(pool2>l2)]
+                                 
+            pool1=pool1[np.where(pool2<u2)]                  
+            pool2=pool2[np.where(pool2<u2)] 
+            
+            av_diff=np.mean(pool1)-np.mean(pool2)
+            wholepool2=wholepool2+av_diff
+            
+#            rms1=np.std(wholepool1)
+            mean1=np.mean(wholepool1)
+#            rms2=np.std(wholepool2)
+            mean2=np.mean(wholepool2)
+            
+            ratio=mean1/mean2
+            wholepool1=wholepool1
+            wholepool2=wholepool2*ratio
+#            ax2.plot(wholepool1)
+#            ax2.plot(wholepool2,alpha=0.5)
         
             
-            new_image_data1=new_image_data1/mean1
+            new_image_data1=(new_image_data1)/mean1
 #            new_image_data1=new_image_data1/rms1
             
-            new_image_data2=new_image_data2/mean2
+            new_image_data2=(new_image_data2+av_diff)/mean2
 #            new_image_data2=new_image_data2/rms2
             
             new_image_data1[np.where(new_image_data1<=0)]=0.00001
@@ -304,6 +319,7 @@ def bright_diff(path_general):
 #                diff=np.mean(pool1-newpool)
 
 #            new_image_data2=new_image_data2+diff
+
             os.remove(path_general+'/fits_images/%s_2.fits'%filename) #remove old file
             os.remove(path_general+'/fits_images/%s_1.fits'%filename)
             wcs=wcs2
@@ -330,6 +346,7 @@ def sub(path_general):
             subtraction=np.absolute(new_image_data1-new_image_data2)
 #            subtraction[~np.isfinite(subtraction)]=0
             subtraction[np.where(subtraction <= 0)]=0.00001
+#            rel=subtraction/new_image_data1
 #                subtraction=ndimage.filters.gaussian_filter(subtraction,3)
 #                mask=np.zeros_like(subtraction)
 #                mask[subtraction>np.percentile(subtraction,75)]=1
@@ -374,24 +391,35 @@ def out_save(path_general,subtraction):
                 pools=subs[np.isfinite(subs)]
                 pools=pools[~np.isnan(pools)]
                 mins,maxs=np.percentile(pools,[50,95])
-                mins,maxs=0.5,2
-                mins,maxs=1,max(pools)
-                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes',filename)
+#                mins,maxs=0.5,2
+#                mins,maxs=1,max(pools)
+                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes',filename+' comparison')
                 os.remove(path_general+'/subtraction/%s_sub.fits'%filename)
             
             plt.close('all')
-            save_png('%s_1.fits'%filename,min1,max1,path_general,wcs1,'no',filename)
+            save_png('%s_1.fits'%filename,min1,max1,path_general,wcs1,'no',filename+' before')
             os.remove(path_general+'/fits_images/%s_1.fits'%filename)
             plt.close('all')
             
-            save_png('%s_2.fits'%filename,min2,max2,path_general,wcs2,'no',filename)
+            save_png('%s_2.fits'%filename,min2,max2,path_general,wcs2,'no',filename+' after')
             os.remove(path_general+'/fits_images/%s_2.fits'%filename)
             plt.close('all')
+
             
-            
 
-
-
+#define a function that checks the number of folders in a directory 
+#run image processing if >30 objects
+def fold_check(path_general,path_folder):
+    n=len(os.walk(path_folder).next()[1])
+    if n>=30:
+        print('images are ready for proccessing')
+        CPR(path_general)
+        bright_diff(path_general)
+        sub(path_general)
+        out_save(path_general,'yes')
+    else:
+        print('insufficient images: min 30 objects')
+    pass
 
 
 

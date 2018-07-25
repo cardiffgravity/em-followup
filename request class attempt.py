@@ -44,7 +44,7 @@ class Request():
         the name and title of the requested observation."""
         
         result_table = Simbad.query_region(coord.SkyCoord(RA, Dec, unit=(u.deg, u.deg), frame='icrs'), radius='0d1m0s')
-        name = str(result_table['MAIN_ID'][0])[2:-1]
+        name = str(result_table['MAIN_ID'][0])
     
         return name 
     
@@ -141,10 +141,12 @@ class Request():
 
 username= "username"
 password = "password"
-RA = 299.5917
-Dec = 35.2017
-PROPOSAL_ID = "PROPID"
+RA = 202.4708
+Dec = 47.1953
+PROPOSAL_ID = "LCOEPO2018A-004"
 magnitude = 9
+expt=30
+
 
 instance = Request(RA, Dec,magnitude,PROPOSAL_ID,username,password)
 
@@ -165,6 +167,7 @@ userrequest_dict = response.json()  # The API will return the newly submitted us
 # Print out the url on the portal where we can view the submitted request
 print('View this observing request: https://observe.lco.global/userrequests/{}/'.format(userrequest_dict['id']))
 
+
 #function to add targets to a .txt file
 #or create new file if none exist
 path_to_file='/Users/lewisprole/Documents/GitHub/em-followup'
@@ -175,6 +178,9 @@ def txtfile(path_to_file,RA,Dec):
     else:
         f= open("target_list.txt","a+")
     name=instance.coord_to_name(RA,Dec)       
-    f.write('%s 30 v %s %s \n'%(name,RA,Dec))
+    f.write('%s %f v %s %s \n'%(name,expt,RA,Dec))
     f.close()
-    
+    pass
+
+txtfile(path_to_file,RA,Dec)
+
