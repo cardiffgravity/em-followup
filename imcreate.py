@@ -35,6 +35,7 @@ import math
 from matplotlib.colors import LogNorm
 from reproject import reproject_interp
 import os
+import csv
 
 
 '''
@@ -124,26 +125,39 @@ def save_png(name,Vmin,Vmax,path_general,wcs,sub,title):
     if sub=='yes':
         fits_data = fits.getdata(path_general+'/subtraction/%s'%name)
         plt.subplot(projection=wcs)
-        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax)
+        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,norm=LogNorm())
 #       norm=LogNorm()
         plt.grid(color='white', ls='solid')
         plt.colorbar()
         plt.title('%s'%title)
         imagename = name.replace('.fits', '.png')
-        plt.savefig(path_general+'/subtraction/%s'%imagename)
+        plt.savefig(path_general+'/Zooniverse_upload/%s'%imagename)
     else:
         fits_data = fits.getdata(path_general+'/fits_images/%s'%name)
         plt.subplot(projection=wcs)
-        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax)
+        plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,norm=LogNorm())
         plt.grid(color='white', ls='solid')
         plt.colorbar()
         plt.title('%s'%title)
         imagename = name.replace('.fits', '.png')
-        plt.savefig(path_general+'/new_images/%s'%imagename)
+        plt.savefig(path_general+'/Zooniverse_upload/%s'%imagename)
         plt.close('all')
 #        cmap='PuRd_r'
 
-
+#function to write the Zooniverse minifest 
+def manifest(name,path_general):
+    if os.path.exists(path_general+"/Zooniverse_upload/Manifest.csv")==False:
+        with open(path_general+"/Zooniverse_upload/Manifest.csv", "w+") as csvfile:
+            write = csv.writer(csvfile)
+            write.writerow(['image1','image2','image3'])
+            write.writerow(['%s_1.png'%name,'%s_2.png'%name,'%s_sub.png'%name])
+    
+    else:
+        with open(path_general+"/Zooniverse_upload/Manifest.csv", "a") as csvfile:
+            write = csv.writer(csvfile)
+            write.writerow(['%s_1.png'%name,'%s_2.png'%name,'%s_sub.png'%name])
+    pass
+    
 
 #'path_images' : path to imagaes folder containing multiple 'name' folders  
 #'path_fits' : path to folder where new .fits images are saved
@@ -372,12 +386,18 @@ def out_save(path_general,subtraction):
             #pool of real data (no NaNs)
             pool1=new_image_data1[np.isfinite(new_image_data1)]
             pool1=pool1[~np.isnan(pool1)]
-            min1,max1=np.percentile(pool1,[50,95])
+            min1,max1=np.percentile(pool1,[90,99])
             
             
             pool2=new_image_data2[np.isfinite(new_image_data2)]
             pool2=pool2[~np.isnan(pool2)]
-            min2,max2=np.percentile(pool2,[50,95])
+            min2,max2=np.percentile(pool2,[90,99])
+            
+            MAX=max(max1,max2)
+            if max1==MAX:
+                MIN=min1
+            else:
+                MIN=min2
 #            max2,min2=max(pool2),min(pool2)
 #            max1,min1=max(pool1),min(pool1)
             
@@ -390,22 +410,22 @@ def out_save(path_general,subtraction):
                 hdu_list.close()
                 pools=subs[np.isfinite(subs)]
                 pools=pools[~np.isnan(pools)]
-                mins,maxs=np.percentile(pools,[50,95])
+                mins,maxs=np.percentile(pools,[50,100])
 #                mins,maxs=0.5,2
-#                mins,maxs=1,max(pools)
+#                mins,maxs=mins,maxs
                 save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes',filename+' comparison')
                 os.remove(path_general+'/subtraction/%s_sub.fits'%filename)
             
             plt.close('all')
-            save_png('%s_1.fits'%filename,min1,max1,path_general,wcs1,'no',filename+' before')
+            save_png('%s_1.fits'%filename,MIN,MAX,path_general,wcs1,'no',filename+' before')
             os.remove(path_general+'/fits_images/%s_1.fits'%filename)
             plt.close('all')
             
-            save_png('%s_2.fits'%filename,min2,max2,path_general,wcs2,'no',filename+' after')
+            save_png('%s_2.fits'%filename,MIN,MAX,path_general,wcs2,'no',filename+' after')
             os.remove(path_general+'/fits_images/%s_2.fits'%filename)
             plt.close('all')
 
-            
+            manifest(filename,path_general)
 
 #define a function that checks the number of folders in a directory 
 #run image processing if >30 objects
@@ -421,6 +441,9 @@ def fold_check(path_general,path_folder):
         print('insufficient images: min 30 objects')
     pass
 
-
-
+path_general='/Users/lewisprole/Documents/University/year3/summer_project'
+#CPR(path_general)
+#bright_diff(path_general)
+#sub(path_general)
+#out_save(path_general,'yes')
 
