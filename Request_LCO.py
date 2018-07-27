@@ -52,7 +52,9 @@ class Request():
         """ takes estimated magnitude for target object and
         calculates the exposure time suitable for the 0.4m 
         LCO telescope"""
-        pass
+        expt = 10**(0.375*magnitude - 6)
+        return expt
+        
     
     def add_target_name(self, RA, Dec):
         """ takes target coordinates in and uses the coords_to_name 
@@ -76,7 +78,6 @@ class Request():
         
         expt = self.exposure_time(magnitude)
         
-        expt = 30
         molecules = [
                 {
                         'type': 'EXPOSE',
