@@ -118,7 +118,20 @@ def coords(data1,data2,system,system2):
     c_join=(coordsy,coordsx)
     return c_join,points
 
-
+#function to take .fits.fz and remove .fz
+def fz_remove(path_general):
+    print('fz_remove')
+    for filename in os.listdir(path_general+'/images'):
+        if filename=='.DS_Store': #problematic folder that shows up sometimes
+            print('.')
+        else:
+            path=path_general+'/images/%s'%filename
+            for name in os.listdir(path):
+                if name.endswith('.fz')==True:
+                    os.rename(path+'/%s'%(name),path+'/%s'%(name[:-3]))
+                    
+    
+    
 
 #function which takes new fits files and saves them as .png files
 def save_png(name,Vmin,Vmax,path_general,wcs,sub,title):
@@ -128,7 +141,10 @@ def save_png(name,Vmin,Vmax,path_general,wcs,sub,title):
         plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,norm=LogNorm())
 #       norm=LogNorm()
         plt.grid(color='white', ls='solid')
-        plt.colorbar()
+        if Vmax-Vmin>=1:            
+            plt.colorbar(label="log scale")
+        else:
+            plt.colorbar(ticks=[Vmin,Vmax],label="log scale")
         plt.title('%s'%title)
         imagename = name.replace('.fits', '.png')
         plt.savefig(path_general+'/Zooniverse_upload/%s'%imagename)
@@ -137,7 +153,10 @@ def save_png(name,Vmin,Vmax,path_general,wcs,sub,title):
         plt.subplot(projection=wcs)
         plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,norm=LogNorm())
         plt.grid(color='white', ls='solid')
-        plt.colorbar()
+        if Vmax-Vmin>=1:            
+            plt.colorbar(label="log scale")
+        else:
+            plt.colorbar(ticks=[Vmin,Vmax],label="log scale")
         plt.title('%s'%title)
         imagename = name.replace('.fits', '.png')
         plt.savefig(path_general+'/Zooniverse_upload/%s'%imagename)
@@ -272,12 +291,9 @@ def bright_diff(path_general):
             pool2=pool2[~np.isnan(pool2)]
             wholepool1=copy.deepcopy(pool1)
             wholepool2=copy.deepcopy(pool2)
-            f, (ax1, ax2) = plt.subplots(1, 2, sharey=False)
-#            ax1.plot(wholepool1)
-#            ax1.plot(wholepool2,alpha=0.5)
+ 
             
-            #want to isolate bright objects, limit pool to 50-80 percentiles 
-            
+        
             l1,u1=np.percentile(pool1,[10,50])
             l2,u2=np.percentile(pool2,[10,50])
             
@@ -301,9 +317,13 @@ def bright_diff(path_general):
 #            rms2=np.std(wholepool2)
             mean2=np.mean(wholepool2)
             
-            ratio=mean1/mean2
-            wholepool1=wholepool1
-            wholepool2=wholepool2*ratio
+            
+          
+            wholepool1=wholepool1/mean1
+            wholepool2=wholepool2/mean2
+            ratio=np.mean(wholepool1)/np.mean(wholepool2)
+            
+            
 #            ax2.plot(wholepool1)
 #            ax2.plot(wholepool2,alpha=0.5)
         
@@ -311,7 +331,7 @@ def bright_diff(path_general):
             new_image_data1=(new_image_data1)/mean1
 #            new_image_data1=new_image_data1/rms1
             
-            new_image_data2=(new_image_data2+av_diff)/mean2
+            new_image_data2=((new_image_data2+av_diff)/mean2)*ratio
 #            new_image_data2=new_image_data2/rms2
             
             new_image_data1[np.where(new_image_data1<=0)]=0.00001
@@ -358,8 +378,11 @@ def sub(path_general):
             new_image_data1,new_image_data2,hdu1,hdu2,wcs1,wcs2=get_fitsimage(path_general,filename)
             
             subtraction=np.absolute(new_image_data1-new_image_data2)
-#            subtraction[~np.isfinite(subtraction)]=0
-            subtraction[np.where(subtraction <= 0)]=0.00001
+            subtraction=(subtraction/new_image_data1)*100   
+            subtraction[np.where(new_image_data1<=0.0000001)]=0
+            subtraction[~np.isfinite(subtraction)]=0
+            subtraction[np.where(subtraction <= 0)]=0.0000001
+            subtraction=ndimage.filters.gaussian_filter(subtraction,3)
 #            rel=subtraction/new_image_data1
 #                subtraction=ndimage.filters.gaussian_filter(subtraction,3)
 #                mask=np.zeros_like(subtraction)
@@ -377,6 +400,8 @@ def sub(path_general):
 #saves image as a png file into 'new_images' file 
 def out_save(path_general,subtraction):
     print('out_save')
+    if os.path.exists(path_general+'/Zooniverse_upload/Manifest.csv')==True:
+        os.remove(path_general+'/Zooniverse_upload/Manifest.csv')
     for filename in os.listdir(path_general+'/images'):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
@@ -410,18 +435,18 @@ def out_save(path_general,subtraction):
                 hdu_list.close()
                 pools=subs[np.isfinite(subs)]
                 pools=pools[~np.isnan(pools)]
-                mins,maxs=np.percentile(pools,[50,100])
+                mins,maxs=np.percentile(pools,[90,100])
 #                mins,maxs=0.5,2
 #                mins,maxs=mins,maxs
-                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes',filename+' comparison')
+                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'yes',filename+': percentage change')
                 os.remove(path_general+'/subtraction/%s_sub.fits'%filename)
             
             plt.close('all')
-            save_png('%s_1.fits'%filename,MIN,MAX,path_general,wcs1,'no',filename+' before')
+            save_png('%s_1.fits'%filename,MIN,MAX,path_general,wcs1,'no',filename+': image 1')
             os.remove(path_general+'/fits_images/%s_1.fits'%filename)
             plt.close('all')
             
-            save_png('%s_2.fits'%filename,MIN,MAX,path_general,wcs2,'no',filename+' after')
+            save_png('%s_2.fits'%filename,MIN,MAX,path_general,wcs2,'no',filename+': image 2')
             os.remove(path_general+'/fits_images/%s_2.fits'%filename)
             plt.close('all')
 
@@ -442,8 +467,11 @@ def fold_check(path_general,path_folder):
     pass
 
 path_general='/Users/lewisprole/Documents/University/year3/summer_project'
-#CPR(path_general)
-#bright_diff(path_general)
-#sub(path_general)
-#out_save(path_general,'yes')
+
+fz_remove(path_general)
+CPR(path_general)
+bright_diff(path_general)
+sub(path_general)
+out_save(path_general,'yes')
+
 
