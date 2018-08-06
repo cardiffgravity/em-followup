@@ -1,0 +1,27 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Aug  6 13:59:04 2018
+
+@author: lewisprole
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+import requests
+import os
+import json
+import sys
+
+payload = {
+    'username': 'lewisprole',
+    'password': 'Walkingdead66'
+}
+
+LOGIN_URL='https://observe.lco.global/accounts/login/'
+    
+
+with requests.Session() as c:
+    c.post(LOGIN_URL, data=payload)
+    r=c.get('https://observe.lco.global/')
+    
