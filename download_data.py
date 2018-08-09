@@ -36,33 +36,33 @@ set start date, ID, and directory
 make a directory path to userdata.dat
 '''
 
-sdate='2018-02-01'
-edate='2018-03-02'
-proposalID="FTPEPO2014A-004"
+
+#def parse_args():
+#    """Parse command-line inputs"""
+#
+#    parser = argparse.ArgumentParser()
+#    parser.add_argument('-sdate', default=None,
+#                        help='Start date for search [YYYY-MM-DD]')
+#    parser.add_argument('-edate', default=None,
+#                        help='End date for search. [YYYY-MM-DD]')
+#    parser.add_argument('-proposalID', default=None,
+#                        help='List of proposals to search for')
+#    parser.add_argument('-datafolder', default=None,
+#                        help='Directory where the data will be downloaded into.')
+#    parser.add_argument('-flatdir', action='store_true',
+#                        help='Use a flat directory structure instead of sorting into date subdirectories')
+#    parser.add_argument('-spectra', action='store_true',
+#                        help='Only download NRES spectral packages (ending w/ .tar.gz)')
+#
+#    args = parser.parse_args()
+#
+#    return args
+sdate='2018-06-19'
+edate='2018-08-19'
+proposalID="LCOEPO2018A-004"
 PATH="/Users/lewisprole/Documents/University/year3/summer_project"
 datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
-PATH="/Users/Tilly/Documents/CUROP/coding"
-datafolder="/Users/Tilly/Documents/CUROP/coding/LCO_images"
-def parse_args():
-    """Parse command-line inputs"""
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-sdate', default=None,
-                        help='Start date for search [YYYY-MM-DD]')
-    parser.add_argument('-edate', default=None,
-                        help='End date for search. [YYYY-MM-DD]')
-    parser.add_argument('-proposalID', default=None,
-                        help='List of proposals to search for')
-    parser.add_argument('-datafolder', default=None,
-                        help='Directory where the data will be downloaded into.')
-    parser.add_argument('-flatdir', action='store_true',
-                        help='Use a flat directory structure instead of sorting into date subdirectories')
-    parser.add_argument('-spectra', action='store_true',
-                        help='Only download NRES spectral packages (ending w/ .tar.gz)')
-
-    args = parser.parse_args()
-
-    return args
+spectra=False
 
 def download_frames(sdate, edate, headers, prop, datafolder):
     """Download files
@@ -94,17 +94,21 @@ def download_frames(sdate, edate, headers, prop, datafolder):
                             'end='+edate+'&' +
                             'PROPID=' + prop,
                             headers=headers).json()
-
+    print(response)
     frames = response['results']
+    print(frames)
     if len(frames) != 0:
         print('\t > Frames identified for the '+sdate+'/'+edate+' period. Checking frames...')
         while True:
             for frame in frames:
+                print(frame)
                 nidentified += 1
                 # Get date of current image frame:
-                date = frame['filename'].split('-')[2]
+                date = frame['OBJECT']
 
                 # Create new folder with the date if not already there:
+                
+                
                 outpath = os.path.join(datafolder, 'raw', date)
                 if not os.path.exists(outpath):
                     os.mkdir(outpath)
@@ -113,7 +117,7 @@ def download_frames(sdate, edate, headers, prop, datafolder):
                 # and is not a _cat.fits, download the file:
                 if not os.path.exists(os.path.join(outpath, frame['filename'])) and\
                    '_cat.fits' != frame['filename'][-9:]:
-                    if args.spectra and not frame['filename'].endswith('.tar.gz'):
+                    if spectra and not frame['filename'].endswith('.tar.gz'):
                         continue
                     print('\t   + File '+frame['filename']+' not found in '+outpath)
                     print('\t     Downloading ...')
@@ -126,7 +130,6 @@ def download_frames(sdate, edate, headers, prop, datafolder):
             else:
                 break
     return nidentified, ndownloaded
-
 
 
 def get_headers_from_token(username, password):
@@ -152,7 +155,7 @@ def get_headers_from_token(username, password):
 
 
 if __name__ == '__main__':
-    args = parse_args()
+#    args = parse_args()
 
     starting_date = sdate
     ending_date = edate
