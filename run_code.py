@@ -10,6 +10,7 @@ import pandas as pd
 import csv
 import imcreate
 import download_data_LCO
+from Request_LCO import *
 #import CODE #Tilly's file extraction code 
 
 '''
@@ -20,27 +21,33 @@ object type can be 'single' or 'multiple'
 '''
 
 
-#simple function allowing code to be run for single target
-#^ or csv file containing multiple targets 
-#file_directory='fake_targets.csv'
-#
-#def run(object_type,file_directory,RA,Dec,mag):
-#    
-#    if object_type=='single':
-#        print(RA,Dec,mag)
-##        CODE(RA,Dec,mag)
-#        pass
-#    
-#    if object_type=='multiple':
-#        data=pd.read_csv(file_directory)
-#        for i in range (len(data)):
-#            RA=data['RA'][i]
-#            Dec=data['Dec'][i]
-#            mag=data['mag'][i]
-#            print(RA,Dec,mag)
-##            CODE(RA,Dec,mag)
-#        pass
+username= "lewisprole"
+password = "Walkingdead66"
+RA = 202.4708
+Dec = 47.1953
+PROPOSAL_ID = "LCOEPO2018A-004"
+magnitude = 9
+expt=30
 
+#run request
+userrequest = Request(RA, Dec,magnitude,PROPOSAL_ID,username,password)
+response = requests.post(
+    'https://observe.lco.global/api/userrequests/',
+    headers = userrequest.retrieve_token(username, password),
+    json = userrequest.final_for_submission(RA, Dec, magnitude, PROPOSAL_ID)  
+)
+try:
+    response.raise_for_status()
+except requests.exceptions.HTTPError as exc:
+    print('Request failed: {}'.format(response.content))
+    raise exc
+    
+userrequest_dict = response.json()  # The API will return the newly submitted userrequest as json
+
+# Print out the url on the portal where we can view the submitted request
+print('View this observing request: https://observe.lco.global/userrequests/{}/'.format(userrequest_dict['id']))
+
+#enter dwonload/processing details
 path_general='/Users/lewisprole/Documents/University/year3/summer_project'
 sdate='2018-06-19'
 edate='2018-08-19'
@@ -49,5 +56,7 @@ path_general="/Users/lewisprole/Documents/University/year3/summer_project"
 datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
 spectra=False
 
+#download iamges
 download_data_LCO.download(sdate,edate,proposalID,datafolder)
-#imcreate.fold_check(path_general,path_general+'/images')
+#process images
+imcreate.fold_check(path_general,path_general+'/images')

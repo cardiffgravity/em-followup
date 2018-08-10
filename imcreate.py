@@ -36,6 +36,7 @@ from matplotlib.colors import LogNorm
 from reproject import reproject_interp
 import os
 import csv
+import shutil
 
 
 '''
@@ -65,9 +66,48 @@ out_save(path_general,'yes')
 --------------------------------------------------------------------
 '''
 
+def remove_space(path_general,dir1):
+    print('remove_space')
+    path=path_general+'/'+dir1
+    for filename in sorted(os.listdir(path)):
+        if filename=='.DS_Store': #problematic folder that shows up sometimes
+            print('.')   
+        else:
+            
+            name_new=filename.replace(' ','_')
+            os.rename(path+'/%s'%(filename) , path+'/%s'%(name_new))
+            
+            
+#a function to move LCO downloaded files into main images folder
+def combine_fold(path_general):
+    print('combine_fold')
+    files = os.listdir(path_general+'/LCO_images/raw')
+    dest=path_general+'/images'
+    for f in files:
+        if f=='.DS_Store': #problematic folder that shows up sometimes
+            print('.')   
+        else:
+            if os.path.exists(dest+'/'+f)==True:
+                shutil.move(dest+'/'+f, path_general+'/rejects')
+            shutil.move(path_general+'/LCO_images/raw/'+f, dest)
+        
+#function to replace any filename spaces with underscores '_'
 
 
-
+#function that checks if there are at least 2 imags per target
+def reject_dir(path_general):
+    print('reject_dir')
+    for filename in sorted(os.listdir(path_general+'/images')):
+        if filename=='.DS_Store': #problematic folder that shows up sometimes
+            print('.')   
+        else:
+            n=len(sorted(os.listdir(path_general+'/images/%s'%filename)))
+            dest=path_general+'/rejects'
+            if n<2:
+                if os.path.exists(dest+'/'+filename)==True:
+                    shutil.rmtree(dest+'/'+filename,ignore_errors=True)
+                shutil.move(path_general+'/images/%s'%filename, dest)
+    
 
 def getimage(path_general,keyword):
 
@@ -121,16 +161,41 @@ def coords(data1,data2,system,system2):
 #function to take .fits.fz and remove .fz
 def fz_remove(path_general):
     print('fz_remove')
-    for filename in os.listdir(path_general+'/images'):
+    for filename in sorted(os.listdir(path_general+'/images')):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
         else:
             path=path_general+'/images/%s'%filename
             for name in os.listdir(path):
                 if name.endswith('.fz')==True:
-                    os.rename(path+'/%s'%(name),path+'/%s'%(name[:-3]))
+                    image=astropy.io.fits.getdata(path+'/'+name)
+                    header=fits.getheader(path+'/'+name,ext=1)
+                    hdu = fits.PrimaryHDU(image,header=header)
+                    hdul = fits.HDUList([hdu])
+                    hdul.writeto(path+'/%s'%name[:-3])   
+                    os.remove(path+'/%s'%name)
+        pass
                     
-    
+def image_rename(path_general):
+    print('image_rename')
+    for filename in sorted(os.listdir(path_general+'/images')):
+        if filename=='.DS_Store': #problematic folder that shows up sometimes
+            print('.')
+        else:
+            path=path_general+'/images/%s'%filename
+            n=len(os.listdir(path))
+            names=os.listdir(path)
+            
+                
+            try:
+                names.remove('.DS_Store')
+                n=n-1
+            except: 
+                pass
+            for i in range (n):
+                os.rename(path+'/%s'%(names[i]),path+'/%s%i.fits'%(filename,i+1))
+            for i in range (n):
+                os.rename(path+'/%s%i.fits'%(filename,i+1),path+'/%s_%i.fits'%(filename,i+1))
     
 
 #function which takes new fits files and saves them as .png files
@@ -188,10 +253,12 @@ def manifest(name,path_general):
 def CPR(path_general):
     print('CPR')
     #for each file in 'images' folder, load data & wcs, get coordinates of pixels
-    for filename in os.listdir(path_general+'/images'):
+    for filename in sorted(os.listdir(path_general+'/images')):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
+            
         else:
+            print(filename)
             hdu1,wcs1,image_data1,hdu2,wcs2,image_data2=getimage(path_general,filename)        
             coordinates1,points1 = coords(image_data1,image_data2,wcs1,wcs2)
             coordinates2,points2 = coords(image_data2,image_data1,wcs2,wcs1)
@@ -269,7 +336,7 @@ def CPR(path_general):
 #change brightness
 def bright_diff(path_general):
     print('bright_diff')
-    for filename in os.listdir(path_general+'/images'):
+    for filename in sorted(os.listdir(path_general+'/images')):
         
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
@@ -371,15 +438,15 @@ def bright_diff(path_general):
 #function to make subtraction images 
 def sub(path_general):
     print('sub')
-    for filename in os.listdir(path_general+'/images'):
+    for filename in sorted(os.listdir(path_general+'/images')):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
         else:
             new_image_data1,new_image_data2,hdu1,hdu2,wcs1,wcs2=get_fitsimage(path_general,filename)
             
             subtraction=np.absolute(new_image_data1-new_image_data2)
-            subtraction=(subtraction/new_image_data1)*100   
-            subtraction[np.where(new_image_data1<=0.0000001)]=0
+            relative=(subtraction/new_image_data1)*100   
+            relative[np.where(new_image_data1<=0.0000001)]=0
             subtraction[~np.isfinite(subtraction)]=0
             subtraction[np.where(subtraction <= 0)]=0.0000001
             subtraction=ndimage.filters.gaussian_filter(subtraction,3)
@@ -402,7 +469,7 @@ def out_save(path_general,subtraction):
     print('out_save')
     if os.path.exists(path_general+'/Zooniverse_upload/Manifest.csv')==True:
         os.remove(path_general+'/Zooniverse_upload/Manifest.csv')
-    for filename in os.listdir(path_general+'/images'):
+    for filename in sorted(os.listdir(path_general+'/images')):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
             print('.')
         else:
@@ -458,6 +525,12 @@ def fold_check(path_general,path_folder):
     n=len(os.walk(path_folder).next()[1])
     if n>=30:
         print('images are ready for proccessing')
+        remove_space(path_general,'images')
+        remove_space(path_general,'LCO_images/raw')
+        combine_fold(path_general)
+        reject_dir(path_general)
+        fz_remove(path_general)
+        image_rename(path_general)
         CPR(path_general)
         bright_diff(path_general)
         sub(path_general)
@@ -468,10 +541,6 @@ def fold_check(path_general,path_folder):
 
 path_general='/Users/lewisprole/Documents/University/year3/summer_project'
 
-fz_remove(path_general)
-CPR(path_general)
-bright_diff(path_general)
-sub(path_general)
-out_save(path_general,'yes')
+
 
 
