@@ -11,15 +11,26 @@ import csv
 import imcreate
 import download_data_LCO
 from Request_LCO import *
-#import CODE #Tilly's file extraction code 
+import time
+import threading
 
-'''
-object type can be 'single' or 'multiple'
+ 
+
+''' HOW TO USE
+1) making requests
+
+can request 'single' or 'multiple' targets
 -if single, set file_directory to 0.
 -if multiple, set RA,Dec,mag to 0
 -multiple objects in csv file with columns RA,Dec,mag
+
+2) 
+
 '''
 
+''' ENTER USER DATA FOR LCO REQUEST
+-------------------------------------------------------------
+'''
 
 username= "lewisprole"
 password = "Walkingdead66"
@@ -28,6 +39,11 @@ Dec = 47.1953
 PROPOSAL_ID = "LCOEPO2018A-004"
 magnitude = 9
 expt=30
+
+
+''' REQUEST LCO IMAGES TO BE TAKEN
+-------------------------------------------------------------
+'''
 
 #run request
 userrequest = Request(RA, Dec,magnitude,PROPOSAL_ID,username,password)
@@ -47,7 +63,12 @@ userrequest_dict = response.json()  # The API will return the newly submitted us
 # Print out the url on the portal where we can view the submitted request
 print('View this observing request: https://observe.lco.global/userrequests/{}/'.format(userrequest_dict['id']))
 
-#enter dwonload/processing details
+
+''' SET UP DIRECTORY TO FOLDER CONTAINING 'IMAGES' FOLDER
+-------------------------------------------------------------
+'''
+
+#enter dOWnload/processing details
 path_general='/Users/lewisprole/Documents/University/year3/summer_project'
 sdate='2018-06-19'
 edate='2018-08-19'
@@ -56,7 +77,20 @@ path_general="/Users/lewisprole/Documents/University/year3/summer_project"
 datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
 spectra=False
 
-#download iamges
-download_data_LCO.download(sdate,edate,proposalID,datafolder)
-#process images
-imcreate.fold_check(path_general,path_general+'/images')
+
+''' DOWNLOAD AND PROCESS IMAGES 
+-------------------------------------------------------------
+'''
+
+#function downloads all LCO images taken with the propID in given time frame
+#checks to see if there are 30 targets in image folder
+#runs image processing code if >30 images 
+def repeat():
+    download_data_LCO.download(sdate,edate,proposalID,datafolder)
+    imcreate.fold_check(path_general)
+    threading.Timer(86400, repeat).start()
+
+
+    
+
+
