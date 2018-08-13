@@ -52,7 +52,7 @@ class Request():
         """ takes estimated magnitude for target object and
         calculates the exposure time suitable for the 0.4m 
         LCO telescope"""
-        expt = 10**(0.375*magnitude - 6)
+        expt = 10**(0.375*(magnitude-6))
         return expt
         
     
