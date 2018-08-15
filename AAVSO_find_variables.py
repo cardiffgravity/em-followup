@@ -10,10 +10,10 @@ import requests
 
 
 #def get_details(ra,dec,filter_band='V',field_of_view=5):
-    '''
-    this function finds the chart id of all NON varying stars in the field...
-    silly aavso
-    '''
+#    '''
+#    this function finds the chart id of all NON varying stars in the field...
+#    silly aavso
+#    '''
 #    result = []
 #    vsp_template = 'https://www.aavso.org/apps/vsp/api/chart/?format=json&fov={}&maglimit=22&ra={}&dec={}'
 #    r = requests.get(vsp_template.format(field_of_view, ra, dec))
@@ -33,12 +33,8 @@ import requests
 
 
 
-'''
-trying to write a code to go throught the vsx instead of vsp but different input and
-output parameters, much less user friendly, not sure if this is even gonna work
-'''
+def get_variables(coords):
+    payload = {'coords': coords}
+    r = requests.get('https://www.aavso.org/vsx/index.php?view=results.get', params = payload)
+    print(r.url)
 
-
-def something(RA, Dec, filter_band = 'V', fov = 7.5):
-    vsx_template = 'https://www.aavso.org/vsx/index.php?view=results.get&coords={}&format=d&size={}&unit=2'
-    r = requests.get(vsx_template.format())
