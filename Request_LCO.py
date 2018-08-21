@@ -39,9 +39,17 @@ class Request():
         self.password = password
     
     def coord_to_name(self, RA, Dec):
-        """ RA and Dec need to be input in decimal degrees for LCO, this function
+        """ 
+        RA and Dec need to be input in decimal degrees for LCO, this function
         chooses the name of the nearest object from SIMBAD and uses that for 
-        the name and title of the requested observation."""
+        the name and title of the requested observation.
+        
+        Args:
+            RA (float): Right Ascention in decimal degrees
+            Dec (float): Declination in decimal degrees
+        Returns:
+            string: first associated name with the given coordinates
+        """
         
         result_table = Simbad.query_region(coord.SkyCoord(RA, Dec, unit=(u.deg, u.deg), frame='icrs'), radius='0d1m0s')
         name = str(result_table['MAIN_ID'][0])
@@ -49,17 +57,36 @@ class Request():
         return name 
     
     def exposure_time(self, magnitude):
-        """ takes estimated magnitude for target object and
+        """ 
+        takes estimated magnitude for target object and
         calculates the exposure time suitable for the 0.4m 
-        LCO telescope"""
-        expt = 10**(0.375*magnitude - 6)
+        LCO telescope
+        
+        Args:
+            magnitude (float): the target magnitude
+        Returns:
+            exposure time (float) specific to the 0.4m telescope
+        """
+        
+        expt = 10**(0.375*(magnitude-6))
+        
         return expt
         
     
     def add_target_name(self, RA, Dec):
-        """ takes target coordinates in and uses the coords_to_name 
+        """ 
+        takes target coordinates in and uses the coords_to_name 
         function to search the name of the target and adds the name 
-        into the target dictionary"""
+        into the target dictionary
+        
+        Args:
+            RA (float): Right Ascention in decimal degrees
+            Dec (float): Declination in decimal degrees
+        Returns:
+            dict: target element of LCO request dict now including the RA and
+            Dec of the object and its name
+        """
+        
         target_name = self.coord_to_name(RA, Dec)
         target = {
                 'name': target_name,
@@ -72,8 +99,13 @@ class Request():
     
     def add_exposure(self, magnitude):
         """
-        uses the exposure_time function and inputs value into
+        Uses the exposure_time function and inputs value into
         molecules dictionary
+        Args:
+            magnitude (float): the target magnitude
+        Returns:
+            dict: molecules element of LCO request dict including the newly
+            calculated exposure time
         """
         
         expt = self.exposure_time(magnitude)
@@ -91,6 +123,17 @@ class Request():
         return molecules
 
     def final_for_submission(self,RA,Dec,magnitude,PROPOSAL_ID):
+        """
+        This function produces the dictionary to be submitted to LCO.
+        Args:
+            RA (float): Right Ascention in decimal degrees
+            Dec (float): Declination in decimal degrees
+            magnitude (float): the target magnitude
+            PROPOSAL_ID (string): LCO proposal ID
+        Returns:
+            dict: full request for LCO
+        """
+        
         userrequest = {
             'group_id': self.coord_to_name(RA, Dec),  
             'proposal': PROPOSAL_ID,
@@ -117,7 +160,7 @@ class Request():
         Returns:
               dict: LCO authentication token
         """
-        # Get LCOGT token:
+        
         response = requests.post(
                     'https://observe.lco.global/api/api-token-auth/',
                     data = {
