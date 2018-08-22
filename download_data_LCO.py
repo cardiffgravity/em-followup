@@ -13,7 +13,8 @@ import argparse
 import calendar
 import requests
 import numpy as np
-
+import time
+import threading
 
 '''
 lewis notes
@@ -38,12 +39,12 @@ make a directory path to userdata.dat
 
 
 
-sdate='2018-06-19'
-edate='2018-08-19'
-proposalID="LCOEPO2018A-004"
-path_general="/Users/lewisprole/Documents/University/year3/summer_project"
-datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
-spectra=False
+#sdate='2018-06-19'
+#edate='2018-08-19'
+#proposalID="LCOEPO2018A-004"
+#path_general="/Users/lewisprole/Documents/University/year3/summer_project"
+#datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
+#
 
 def download_frames(sdate, edate, headers, prop, datafolder):
     """Download files
@@ -98,6 +99,7 @@ def download_frames(sdate, edate, headers, prop, datafolder):
                 # and is not a _cat.fits, download the file:
                 if not os.path.exists(os.path.join(outpath, frame['filename'])) and\
                    '_cat.fits' != frame['filename'][-9:]:
+                    spectra=False
                     if spectra and not frame['filename'].endswith('.tar.gz'):
                         continue
                     print('\t   + File '+frame['filename']+' not found in '+outpath)
@@ -134,7 +136,7 @@ def get_headers_from_token(username, password):
     headers = {'Authorization': 'Token ' + token}
     return headers
 
-def download(sdate,edate,proposalID,datafolder):
+def download(path_general,sdate,edate,proposalID,datafolder):
     
     
     starting_date = sdate
