@@ -26,8 +26,28 @@ that field.
 
 **Example of use:**
 ```python
-s = "Python syntax highlighting"
-print s
+>>>fromRA = 9.1
+>>>toRA = 10.8
+>>>fromDec = -4.1 	
+>>>toDec = 3.2
+
+>>>RA, Dec = get_variables(fromRA, toRA, fromDec, toDec)
+
+>>>print(RA)
+
+9.11692
+9.22075
+9.32167
+9.39625
+9.45395
+
+>>>print(Dec)
+
+-0.52356
+3.11739
+1.96000
+0.29417
+-0.05333
 ```
 
 ### imcreate
