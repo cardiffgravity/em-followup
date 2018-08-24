@@ -8,14 +8,15 @@ Astropy 3.0.3
 Requests 2.14.2
 
 ### Request_LCO
-- This module contains a class for requesting observations with the [Las Cumbres Observatories](lco.global).
+- This module contains a class for requesting observations with the [Las Cumbres Observatories](https://lco.global) network of telescopes.
+- The proposal used in this porject only has access to the 0.4m telescopes, therefore this code is specific to those telescopes.
 
-*Example of use:*
+**Example of use:**
 
 ### download_data_LCO
 
 
-*Example of use:*
+**Example of use:**
 
 ### AAVSO_get_variables
 - The Zooniverse project asks users to circle the variations observed in images taken 5-7 days apart.
@@ -23,13 +24,16 @@ Requests 2.14.2
 that field.
 - Circle are drawn around these known variables so that only "new" variables will be highlighted in the Zooniverse project.
 
-*Example of use:*
-
+**Example of use:**
+```python
+s = "Python syntax highlighting"
+print s
+```
 
 ### imcreate
 
 
-*Example of use:*
+**Example of use:**
 
 ### run_code
 
