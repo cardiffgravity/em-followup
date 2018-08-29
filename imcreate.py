@@ -41,7 +41,10 @@ import shutil
 import time
 import threading
 import skimage.draw
-
+from xml.etree import ElementTree
+import requests
+from scipy.fftpack import ifftn
+from scipy.signal import medfilt
 '''
 --------------------------------------------------------------------
 
@@ -64,22 +67,29 @@ e.g. target folder called 'keyword', images within called 'keyword_1', 'keyword_
 name target folders using actual target name 
 
 to use: example
+
 path_general='/Users/lewisprole/Documents/University/year3/summer_project'
+remove_space(path_general,'images')
+remove_space(path_general,'LCO_images/raw')
+combine_fold(path_general)
+reject_dir(path_general)
+fz_remove(path_general)
+image_rename(path_general)
 CPR(path_general)
 bright_diff(path_general)
 sub(path_general)
-out_save(path_general,'yes')
+out_save(path_general,'yes','yes')
 
 this is all that is neccessary
 
 --------------------------------------------------------------------
 '''
 
-def remove_space(path_general,dir1):
+def remove_punctuation(path_general,dir1):
     '''function that will remove any spaces in the target folder name
     input: path to general folder, name of images folder e.g 'images'
     '''
-    print('remove_space')
+    print('remove_punctuation')
     path=path_general+'/'+dir1
     for filename in sorted(os.listdir(path)):
         if filename=='.DS_Store': #problematic folder that shows up sometimes
@@ -87,6 +97,8 @@ def remove_space(path_general,dir1):
         else:
             
             name_new=filename.replace(' ','_')
+            name_new=name_new.replace('"','')
+            name_new=name_new.replace("'",'')
             os.rename(path+'/%s'%(filename) , path+'/%s'%(name_new))
             
             
@@ -148,7 +160,6 @@ def getimage(path_general,keyword):
     hdu_list2.close()
     
     return hdu1,wcs1,image_data1,hdu2,wcs2,image_data2
-
 
 
 #similar function used later for extracting new fits images 
@@ -229,8 +240,7 @@ def image_rename(path_general):
             path=path_general+'/images/%s'%filename
             n=len(os.listdir(path))
             names=os.listdir(path)
-            
-                
+                            
             try:
                 names.remove('.DS_Store')
                 n=n-1
@@ -255,19 +265,22 @@ def save_png(name,Vmin,Vmax,path_general,wcs,types,contour):
         fits_data = fits.getdata(path_general+'/subtraction/%s'%name)
         c='viridis'
         title='%s: subtraction image'%t_name
+        norm=LogNorm()
     if types=='relative':
         fits_data = fits.getdata(path_general+'/relative/%s'%name)
         c='plasma'
         title='%s: percentage change'%t_name
+        norm=LogNorm()
     if types=='normal':
         fits_data = fits.getdata(path_general+'/fits_images/%s'%name)
         c='magma'
         n=name.find('.')
         t_name=name[:n]
         title='%s'%t_name
+        norm=colors.SymLogNorm(Vmax/2)
         
     plt.subplot(projection=wcs)
-    plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,cmap=c,norm=LogNorm())
+    plt.imshow(fits_data,vmin=Vmin,vmax=Vmax,cmap=c,norm=norm)
     plt.grid(color='white', ls='solid')
     if Vmax-Vmin>=1:            
         plt.colorbar(label="log scale")
@@ -319,8 +332,7 @@ def iso_star(image_data,iterations):
     for i in range (iterations):
         pool=pool[np.where(pool>med)]
         med=np.median(pool)
-    
-    pool=pool[np.where(pool>med)]
+ 
     image_copy[np.where(nans==1)]=0
     stars[np.where(image_copy>med)]=1
     background[np.where(image_copy<0.5*med)]=1
@@ -329,185 +341,214 @@ def iso_star(image_data,iterations):
 
 
 
-def background_estimate(image_data1,image_data2,use_for):
-    '''function to estimate a value of the background of an image by splitting the image
-    into small squares taking the average background value across all squares.
-    function can be used in 2 ways:
-    If you wish to use the background value as an offset to calabrate the data brightness
-    (a.k.a. use_for='subtract') bright objects will be masked out and a mean average of the 
-    remaining data is calculated which also considers negative values to give a base background value.
-    If you wish to use the average value as a normalising constant to multiply the image by,
-    (a.k.a. use_for='divide') only the brightest objects are masked out leaving a more representative data pool, 
-    pixel values are also taken as their absolute value when calculating the mean.
-    input: image_data1,image_data2,use of function
-    output:binary images where 1 represents the background for images 1 & 2, the background value 
-    for images 1 & 2, binary images where 1 represents masked out bright objects in images 1 & 2.
+def med_filt(diff_data,square_size):
+    '''function that applies a median filter to an image
+    median pixel value of a large square of dimension 'square_size' is calculated
+    and replaces all pixel values in the square, the square moves by (square_size/5)
+    each turn, overlapping 5 times.
+    input:image,square size.
+    output:median filter of image.
     '''
+    
+    y,x=diff_data.shape[0],diff_data.shape[1]
+    mfilter=np.zeros_like(diff_data)
+    
+    s=int(square_size)
+    r=int(s/5)
+    for i in range (int(x/r-s/r+1)):
+        for j in range (int(y/r-s/r+1)):
+            square=diff_data[j*r:j*r+s,i*r:i*r+s]
 
+            pool=square[np.isfinite(square)]
+            
+            med=np.median(pool)
+
+            
+            mfilter[int(j*r):int(j*r+s),int(i*r):int(i*r+s)]=med
+            
+    #number of pixels left at the the end that didn't make it into a square
+    xl=x%s
+    yl=y%s
+    #make them nans
+    mfilter[int(-yl):,:]=np.nan
+    mfilter[:,int(-xl):]=np.nan
+    
+    return mfilter
+            
+def offset_filter(image_data1,image_data2):
+    '''function to create a filter of the varying offset between 2 images
+    to be added to image2, by applying a median filter to the difference image.
+    The stars are removed to consider nackground values only.
+    input:image1,image2
+    output:image2 after the offset filter has been added.
+    '''
+    #get star positions
+    stars1,b=iso_star(image_data1,2)
+    stars2,b=iso_star(image_data2,2)
+    #shared star map for both images
+    stars=np.zeros_like(image_data1)
+    stars[np.where(stars1==1)]=1
+    stars[np.where(stars2==1)]=1
+    #map image differences 
+    diff_filter=image_data1-image_data2
+    #remove star differences
+    diff_filter[np.where(stars==1)]=np.nan
+    #blur with median filter
+    diff_filter=med_filt(diff_filter,500)    
+    diff_filter=ndimage.filters.gaussian_filter(diff_filter,10)
+    #apply to image_data2
+    image_data2=image_data2+diff_filter
+    return image_data2
+
+
+def ratio_filter(image_data1,image_data2):
+    '''function to create a filter of the varying ratio between 2 images
+    to be multiplied to image2, by applying a median filter to the ratio image.
+    input:image1,image2
+    output:image2 after the offset filter has been multiplied.
+    '''
+    stars1,b=iso_star(image_data1,2)
+    stars2,b=iso_star(image_data2,2)
+    #shared star map for both images
+    stars=np.zeros_like(image_data1)
+    stars[np.where(stars1==1)]=1
+    stars[np.where(stars2==1)]=1
+    #map image differences 
+    diff_filter=image_data1/image_data2
+    diff_filter[np.where(stars==0)]=np.nan
+    #blur with median filter
+    
+    diff_filter=med_filt(diff_filter,500)
+    diff_filter=ndimage.filters.gaussian_filter(diff_filter,10)
+    image_data2=image_data2*diff_filter
+    return image_data2
+
+ 
+def background_estimate(image_data1,size):
+    '''function to create a background fiter by removing the stars and 
+    generating nosie based on the surrounding background to fill in the stars.
+    Noise is generated in small overlapping boxes to represent local background.
+    input: image, size of the sample box for noise generation.
+    '''
+    
     y,x=image_data1.shape[0],image_data1.shape[1]
-    #record nans to put back into image later 
-    nan_mask=np.zeros_like(image_data1)
-    nan_mask[~np.isfinite(image_data1)]=1
-    #figure out how much of the image wont make it into a square
-    remx=x%1500 
-    remy=y%1500
-    if 1500>x:
-        x=1500
-        remx=0
-    if 1500>y:
-        y=1500
-        remy=0
-    
-    #split image into smaller squares for local background values
-    #squares of 500 pixels
-   
     background1=np.zeros_like(image_data1)
-    stars1=np.zeros_like(image_data1)
-
-    #remove this overlap from background calculation    
-    background1[int(y-remy):,:]=np.nan
-    background1[:,int(x-remx):]=np.nan
     
-    for i in range (int(x/1500)):
-        for j in range (int(y/1500)):
-            square=copy.deepcopy(image_data1[1500*j:1500*j+1500,1500*i:1500*i+1500])               
-            
-            star_mask,bg_mask=iso_star(square,2)
-
-            square[~np.isfinite(square)]=0 #avoiding "invalid value encountered in greater"
-            if use_for=='subtract':         
-                star_mask,bg_mask=iso_star(square,2) #isolated stars
-                square[np.where(star_mask==1)]=np.nan #isolated background
-#            if use_for =='divide':
-#                star_mask,bg_mask=iso_star(square,1) #get rid of low values
-#                square[np.where(star_mask==0)]=np.nan
-                
-            background1[1500*j:1500*j+1500,1500*i:1500*i+1500]=square
-            stars1[1500*j:1500*j+1500,1500*i:1500*i+1500]=star_mask
-    #re-introduce nans
-    background1[np.where(nan_mask==1)]=np.nan
-    plt.figure(),plt.imshow(background1)
-    #mean background across whoel image
-    if use_for=='divide':
-        bg1=np.mean(np.absolute(background1[np.isfinite(background1)]))
-    if use_for=='subtract':
-        bg1=np.mean(background1[np.isfinite(background1)])
-    
-
-    #repeat for image 2 
-    y,x=image_data2.shape[0],image_data2.shape[1]
     #record nans to put back into image later 
-    nan_mask=np.zeros_like(image_data2)
-    nan_mask[~np.isfinite(image_data2)]=1
-    #figure out how much of the image wont make it into a square
-    remx=x%1500 
-    remy=y%1500
-    if 1500>x:
-        x=1500
-        remx=0
-    if 1500>y:
-        y=1500
-        remy=0
-
-    background2=np.zeros_like(image_data2)
-    stars2=np.zeros_like(image_data2) 
-    
-    background2[int(y-remy):,:]=np.nan
-    background2[:,int(x-remx):]=np.nan       
-    
-    for i in range (int(x/1500)):
-        for j in range (int(y/1500)):
-            square=copy.deepcopy(image_data2[1500*j:1500*j+1500,1500*i:1500*i+1500])
-            
-            square[~np.isfinite(square)]=0 #avoiding "invalid value encountered in greater"
-            if use_for=='subtract':         
-                star_mask,bg_mask=iso_star(square,2) #isolated stars
-                square[np.where(star_mask==1)]=np.nan #isolated background
-#            if use_for =='divide':
-#                star_mask,bg_mask=iso_star(square,1) #get rid of low values
-#                square[np.where(star_mask==0)]=np.nan
-                
-                
-            background2[1500*j:1500*j+1500,1500*i:1500*i+1500]=square
-            stars2[1500*j:1500*j+1500,1500*i:1500*i+1500]=star_mask
-                
-    #re-introduce nans
-    background2[np.where(nan_mask==1)]=np.nan
-    
-    if use_for=='divide':
-        bg2=np.mean(np.absolute(background2[np.isfinite(background2)]))
-    if use_for=='subtract':
-        bg2=np.mean(background2[np.isfinite(background2)])
-    
-    return background1,background2,bg1,bg2,stars1,stars2
-
-#function to get average ratio of brightness between images 
-def bright_ratio(image_data1,image_data2):
-    '''function to calculate the ratio of brightness between images by splitting
-    the images into smaller squares and summing the total brightness of their pixels,
-    the ratio of the sum in both images is calcuated and the mean value across all squares
-    is taken.
-    input:image_data1,image_data2
-    output: average ratio of brightness
-    '''
-    RATIO = np.zeros_like(image_data1)
-
-    x,y=RATIO.shape[1],RATIO.shape[0]
-    
     nan_mask=np.zeros_like(image_data1)
     nan_mask[~np.isfinite(image_data1)]=1
-    nan_mask[~np.isfinite(image_data2)]=1
     
-    image_data1[np.where(nan_mask==1)]=0
-    image_data2[np.where(nan_mask==1)]=0
+    #remove stars
+    stars1,b=iso_star(image_data1,1)
+    image=copy.deepcopy(image_data1)
+    image[np.where(stars1==1)]=np.nan
+    #figure out how much of the image wont make it into a square
     
-
-    remx=x%1500
-    remy=y%1500
-    if 1500>x:
-        x=1500
+    #square overlap
+    s=size
+    r=s/5
+    X=int(x/r-s/r+1)
+    Y=int(y/r-s/r+1)
+    #figuring out how much of the image doesn't get covered at the end
+    remx=x%r 
+    remy=y%r
+    #accounting for if the square is bigger than the image
+    if X<=0:
+        X=1
         remx=0
-    if 1500>y:
-        y=1500
+    if Y<=0:
+        Y=1
         remy=0
     
-    for i in range (int(x/1500)):
-        for j in range (int(y/1500)):
-            square1=copy.deepcopy(image_data1[1500*j:1500*j+1500,1500*i:1500*i+1500])
+    #split image into smaller squares
+    for i in range (int(X)):
+        for j in range (int(Y)):
             
-            square2=copy.deepcopy(image_data2[1500*j:1500*j+1500,1500*i:1500*i+1500])
-   
+            square=copy.deepcopy(image[int(r*j):int(r*j+s),int(r*i):int(r*i+s)]) 
+            ys,xs=square.shape[0],square.shape[1]
+            stars=stars1[int(r*j):int(r*j+s),int(r*i):int(r*i+s)]
+            #remove nans
+            pool=square[np.isfinite(square)]
+            
+            #create noise baed on surrounding values 
+            noise=numpy.random.normal(np.median(pool),np.max(pool),(ys,xs))
+            #fill in the stars with background nosie
+            square[np.where(stars==1)]=noise[np.where(stars==1)]
+            
 
-            stars,bg=iso_star(square1,3)
-            
-            
-            pool1=square1[np.where(stars==1)]
-            pool2=square2[np.where(stars==1)]
+            background1[int(r*j+2*r):int(r*j+3*r),int(r*i+2*r):int(r*i+3*r)]=square[int(2*r):int(3*r),int(2*r):int(3*r)]    
+           
 
-            
-            pool1=pool1[np.isfinite(pool1)]
-            pool2=pool2[np.isfinite(pool2)]
-        
-            
-            
-            
-            brightness1=sum(pool1)
-            brightness2=sum(pool2)
-            print(brightness1,brightness2)
-            ratio=(brightness1/brightness2)
-      
-            RATIO[1500*j:1500*j+1500,1500*i:1500*i+1500]=ratio
+    background1[:int(2*r),:]=np.nan
+    background1[:,:int(2*r)]=np.nan
+    
+    background1[:,int(-remx-2*r):]=np.nan
+    background1[int(-remy-2*r):,:]=np.nan
+    
 
-            
-    RATIO[int(y-remy):,:]=np.nan
-    RATIO[:,int(x-remx):]=np.nan
+    return background1
+
+
+
+def get_variables(fromRA, toRA, fromDec, toDec):
+    '''function to find any variable stars that might be in the image
+    input: minimum and maximum ra, minimum and maximum dec
+    output: list of ra and decs
+    '''
+    
+    payload = {'fromra':fromRA,
+           'tora':toRA, 
+           'fromdec':fromDec,
+           'todec':toDec}
+
+    response = requests.get('https://www.aavso.org/vsx/index.php?view=api.list', params = payload)
+    tree = ElementTree.fromstring(response.content)   
+    ras=[]
+    decs=[]
+    for variable in tree.findall('VSXObject'):
+        ra = variable.find('RA2000').text
+        dec = variable.find('Declination2000').text
+        ras.append(ra)
+        decs.append(dec)
+    return ras, decs
+
+
+def circles(path_general,keyword):    
+    '''function that will create a cirlce around a given ra/dec coordinate
+    input: path to general folder, target folder name
+    output: binary images with cirlces as 1s to be used as contour data on a plot
+    '''
+    hdu1,wcs1,image_data1,hdu2,wcs2,image_data2=get_fitsimage(path_general,keyword)
+    mask=np.zeros_like(image_data1)
+    
+    c_join,points,min_ra,max_ra,min_dec,max_dec=coords(image_data1,image_data2,wcs1,wcs2)
+    
+    ras,decs=get_variables(min_ra,max_ra,min_dec,max_dec)
     
     
-    av_ratio=np.mean(RATIO[np.isfinite(RATIO)])
+    if len(ras)>0:
+        ras=np.array(ras,dtype='float64')
+        decs=np.array(decs,dtype='float64')
+        pixels=wcs1.wcs_world2pix(ras,decs,1)
+        px,py=np.int_(pixels[1]),np.int_(pixels[0])
+        mask[px,py]=1
+        points=np.where(mask==1)
+        if len(points)==0:
+            pass
+        if len(points[0])==1:
+            y,x=points[0],points[1]
+            cy,cx=skimage.draw.circle(int(y),int(x),50)
+            mask[cy,cx]=1
+        if len(points[0])>1:
+            for i in points: 
+                y,x=i[0],i[1]
+                cy,cx=skimage.draw.circle(int(y),int(x),50)
+                mask[cy,cx]=1
+    return mask
         
-    return av_ratio
-            
-        
+
+    
+
 
 #function that crops & rotates images, and re-sizes pixels
 #so that both images have same format
@@ -538,7 +579,7 @@ def CPR(path_general):
             yrange1 = max(coordinates1[0])-min(coordinates1[0])
             yrange2 = max(coordinates2[0])-min(coordinates2[0])
             
-            if xrange1>=xrange2 : 
+            if xrange1>=xrange2: 
                 if  yrange1>= yrange2:
                     new_image_data1, footprint = reproject_interp(hdu1, hdu2.header)
                     new_image_data2=image_data2 #reproject reformats image to same format
@@ -617,33 +658,20 @@ def bright_diff(path_general):
         else:
             #get images
             hdu1,wcs1,new_image_data1,hdu2,wcs2,new_image_data2=get_fitsimage(path_general,filename)
-            #blur
+            
+            
+            
+            #normalise           
             new_image_data1=ndimage.filters.gaussian_filter(new_image_data1,3)
+            d1=new_image_data1[np.isfinite(new_image_data1)]
+            new_image_data1=(new_image_data1-np.mean(d1))/np.std(d1)
+           
             new_image_data2=ndimage.filters.gaussian_filter(new_image_data2,3)
-            #remember the pixels that are NaNs for later
-            nan_mask=np.zeros_like(new_image_data1)
-            nan_mask[~np.isfinite(new_image_data1)]=1
-            nan_mask[~np.isfinite(new_image_data2)]=1
-            
-            
-            #estimate background
-            background1,background2,bg1,bg2,stars1,stars2=background_estimate(new_image_data1,new_image_data2,'subtract')
-            
-            #subtract background to centre stars around 0
-            diff=bg1-bg2
-#            new_image_data1=new_image_data1-bg1
-            new_image_data2=new_image_data2+diff
-            
-            #get new background
-            background1,background2,bg1,bg2,stars1,stars2=background_estimate(new_image_data1,new_image_data2,'divide')
-            
-            #normalise
-            new_image_data1=new_image_data1/bg1
-            new_image_data2=new_image_data2/bg2
-            
-            #calabrate scales
-            ratio=bright_ratio(new_image_data1,new_image_data2)
-            new_image_data2=new_image_data2*ratio
+            d2=new_image_data2[np.isfinite(new_image_data2)]
+            new_image_data2=(new_image_data2-np.mean(d2))/np.std(d2)
+
+            #apply offset filter
+            new_image_data2=offset_filter(new_image_data1,new_image_data2)
             
 
 
@@ -663,33 +691,7 @@ def bright_diff(path_general):
             hdul.writeto(path_general+'/fits_images/%s_1.fits'%filename)
 
 
-def circles(path_general,keyword):    
-    '''function that will create a cirlce around a given ra/dec coordinate
-    input: path to general folder, target folder name
-    output: binary images with cirlces as 1s to be used as contour data on a plot
-    FUNCTION NOT FINISHED, ONLY CREATES CIRCLE AT CENTRE COORDINATE ATM
-    INTENDED FOR IDENTIFYING VARIABLE STARS WITHIN THE IMAGE
-    NEEDS RA/DEC ENTRIES FROM VARIABLE STAR ARCHIVE
-    '''
-    hdu1,wcs1,image_data1,hdu2,wcs2,image_data2=get_fitsimage(path_general,keyword)
-    mask=np.zeros_like(image_data1)
-    pixels=wcs1.wcs.crpix
-#    pixels=wcs1.wcs_world2pix(ra,dec,1)
-    px,py=int(pixels[1]),int(pixels[0])
-    mask[px,py]=1
-    points=np.where(mask==1)
-    if len(points)==0:
-        pass
-    if len(points[0])==1:
-        y,x=points[0],points[1]
-        cy,cx=skimage.draw.circle(int(y),int(x),50)
-        mask[cy,cx]=1
-    if len(points[0])==2:
-        for i in points: 
-            y,x=i[0],i[1]
-            cy,cx=skimage.draw.circle(int(y),int(x),50)
-            mask[cy,cx]=1
-    return mask
+
             
 
 def sub(path_general):
@@ -704,33 +706,24 @@ def sub(path_general):
         else:
             hdu1,wcs1,new_image_data1,hdu2,wcs2,new_image_data2=get_fitsimage(path_general,filename)
             
-#            #blur
-            new_image_data1=ndimage.filters.gaussian_filter(new_image_data1,3)
-            new_image_data2=ndimage.filters.gaussian_filter(new_image_data2,3)
             
             #record nans
             nan_mask=np.zeros_like(new_image_data1)
             nan_mask[~np.isfinite(new_image_data1)]=1
             nan_mask[~np.isfinite(new_image_data2)]=1
             
-            #tempory remove nans
-            new_image_data1[np.where(nan_mask==1)]=0
-            new_image_data2[np.where(nan_mask==1)]=0
-            
+     
             #difference image
             subtraction=np.absolute(new_image_data1-new_image_data2)
             
             #relative image difference (percentage)
-            relative=np.absolute(subtraction/new_image_data1)*100   
-            
-            #put the nans back
-            subtraction[np.where(nan_mask==1)]=np.nan
-            relative[np.where(nan_mask==1)]=np.nan
+            relative=np.absolute(subtraction/new_image_data1)*100 
             
             #blur
-            subtraction=ndimage.filters.gaussian_filter(subtraction,3)
             relative=ndimage.filters.gaussian_filter(relative,3)
+            subtraction=ndimage.filters.gaussian_filter(subtraction,3)
             
+
             
             if os.path.exists(path_general+'/subtraction/%s_sub.fits'%filename)==True:
                 os.remove(path_general+'/subtraction/%s_sub.fits'%filename)
@@ -762,7 +755,8 @@ def out_save(path_general,subtraction,relative):
         else:
             print(filename)
             hdu1,wcs1,new_image_data1,hdu2,wcs2,new_image_data2=get_fitsimage(path_general,filename)
-#            circle=circles(path_general,filename)
+            
+            circle=circles(path_general,filename)
             
             #pool of real data (no NaNs)
             pool1=new_image_data1[np.isfinite(new_image_data1)]
@@ -794,7 +788,7 @@ def out_save(path_general,subtraction,relative):
                 pools=pools[~np.isnan(pools)]
                 mins,maxs=np.percentile(pools,[95,100])
 
-                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'subtraction','no')
+                save_png('%s_sub.fits'%filename,mins,maxs,path_general,wcs1,'subtraction',circle)
                 os.remove(path_general+'/subtraction/%s_sub.fits'%filename)
                 plt.close('all')
                 
@@ -807,18 +801,18 @@ def out_save(path_general,subtraction,relative):
                 hdu_list.close()
                 pools=subs[np.isfinite(subs)]
                 pools=pools[~np.isnan(pools)]
-                mins,maxs=np.percentile(pools,[95,100])
+                mins,maxs=np.percentile(pools,[95,99])
                 save_png('%s_rel.fits'%filename,mins,maxs,path_general,wcs1,'relative','no')
                 os.remove(path_general+'/relative/%s_rel.fits'%filename)
                 plt.close('all')
             
             plt.close('all')
             save_png('%s_1.fits'%filename,MIN,MAX,path_general,wcs1,'normal','no')
-#            os.remove(path_general+'/fits_images/%s_1.fits'%filename)
+            os.remove(path_general+'/fits_images/%s_1.fits'%filename)
             plt.close('all')
             
             save_png('%s_2.fits'%filename,MIN,MAX,path_general,wcs2,'normal','no')
-#            os.remove(path_general+'/fits_images/%s_2.fits'%filename)
+            os.remove(path_general+'/fits_images/%s_2.fits'%filename)
             plt.close('all')
 
             manifest(filename,path_general)
@@ -826,15 +820,19 @@ def out_save(path_general,subtraction,relative):
 
 def fold_check(path_general):
     '''function to check how many image target folders there are in the 
-    'images' folder and run the image-processing functions if there are >30
+    'images' folder and run the image-processing functions if there are >30.
+    function will move original fits images to the 'finished_images' folder after completion.
     input: path to general folder
     '''
     path_folder=path_general+'/images'
-    n=len(os.walk(path_folder).next()[1])
+    path_folder_LCO=path_general+'/LCO_images'
+    n1=len(os.walk(path_folder).next()[1])
+    n2=len(os.walk(path_folder_LCO).next()[1])
+    n=n1+n2
     if n>=30:
         print('images are ready for proccessing')
-        remove_space(path_general,'images')
-        remove_space(path_general,'LCO_images/raw')
+        remove_punctuation(path_general,'images')
+        remove_punctuation(path_general,'LCO_images/raw')
         combine_fold(path_general)
         reject_dir(path_general)
         fz_remove(path_general)
@@ -854,8 +852,6 @@ def fold_check(path_general):
         print('insufficient images: min 30 objects')
     pass
 
-
-    
 
 
 

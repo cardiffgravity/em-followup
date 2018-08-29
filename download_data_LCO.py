@@ -30,11 +30,7 @@ password =
 datafolder = 
 proposals = 
 
-in command prompt 
-python Documents/University/year3/summer_project/download_data.py -sdate 2016-04-01 -proposalID "MyProp-001" -datafolder "/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
-set start date, ID, and directory
 
-make a directory path to userdata.dat
 '''
 
 
