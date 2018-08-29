@@ -9,12 +9,10 @@ Created on Tue Jul 17 10:02:19 2018
 import os
 import time
 import sys
-import argparse
 import calendar
 import requests
 import numpy as np
-import time
-import threading
+
 
 '''
 lewis notes
@@ -33,14 +31,6 @@ proposals =
 
 '''
 
-
-
-#sdate='2018-06-19'
-#edate='2018-08-19'
-#proposalID="LCOEPO2018A-004"
-#path_general="/Users/lewisprole/Documents/University/year3/summer_project"
-#datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
-#
 
 def download_frames(sdate, edate, headers, prop, datafolder):
     """Download files
@@ -195,8 +185,6 @@ def download(path_general,sdate,edate,proposalID,datafolder):
 
     # Get frame names from starting to ending date:
     for prop in proposals:
-        prop_frame_names = np.array([])
-        prop_frame_urls = np.array([])
         c_y, c_m, c_d = starting_date.split('-')
         e_y, e_m, e_d = np.array(ending_date.split('-')).astype('int')
         while True:
@@ -221,5 +209,5 @@ def download(path_general,sdate,edate,proposalID,datafolder):
                 break
 
     print('\n\t Done!\n')
-    pass
+
 
