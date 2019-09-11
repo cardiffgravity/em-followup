@@ -60,8 +60,8 @@ make a directory path to userdata.dat
 sdate='2018-06-19'
 edate='2018-08-19'
 proposalID="LCOEPO2018A-004"
-PATH="/Users/lewisprole/Documents/University/year3/summer_project"
-datafolder="/Users/lewisprole/Documents/University/year3/summer_project/LCO_images"
+PATH="/Users/annac/Documents/Summer Project"
+datafolder="/Users/annac/Documents/Summer Project/LCO_images"
 spectra=False
 
 def download_frames(sdate, edate, headers, prop, datafolder):

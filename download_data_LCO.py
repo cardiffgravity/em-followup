@@ -15,24 +15,24 @@ import numpy as np
 
 
 '''
-lewis notes
 create txt file called userdata.txt
 write:
 LCOGT archive username, password, datafolder, and the name of the proposals
 datafolder (I think) is the name of where you want to save files 
-names of the proposals separated by commas 
+names of the proposals and objects separated by commas 
 
 e.g.
 username = 
 password = 
 datafolder = 
 proposals = 
+objects = 
 
 
 '''
 
 
-def download_frames(sdate, edate, headers, prop, datafolder):
+def download_frames(sdate, edate, headers, prop, datafolder, obj):
     """Download files
       This function downloads all the frames for a given range of dates, querying
       50 frames at a time (i.e., if 150 frames have to be downloaded, the process 
@@ -60,8 +60,9 @@ def download_frames(sdate, edate, headers, prop, datafolder):
                             'RLEVEL=91&' +
                             'start='+sdate+'&' +
                             'end='+edate+'&' +
-                            'PROPID=' + prop,
-                            headers=headers).json()
+                            'PROPID=' +prop+'&' +
+                            'OBJECT=' +obj,
+                            headers={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36'}).json()
     print(response)
     frames = response['results']
     print(frames)
@@ -122,13 +123,14 @@ def get_headers_from_token(username, password):
     headers = {'Authorization': 'Token ' + token}
     return headers
 
-def download(path_general,sdate,edate,proposalID,datafolder):
+def download(path_general,sdate,edate,proposalID,datafolder,obj):
     
     
     starting_date = sdate
     ending_date = edate
     propID = proposalID
     dfolder = datafolder
+    OBJECT = obj
 
     print('\n\t ----------------------------------------------')
     print('\t                lcogtDD v.1.2.\n')
@@ -165,16 +167,23 @@ def download(path_general,sdate,edate,proposalID,datafolder):
     password = (f.readline().split('=')[-1]).split()[0]
     datafolder = (f.readline().split('=')[-1]).split()[0]
     proposals = (f.readline().split('=')[-1]).split(',')
+    objects = (f.readline().split('=')[-1]).split(',')
 
     if propID is not None:
         proposals = propID.split(',')
 
     if dfolder is not None:
         datafolder = dfolder
+        
+    if OBJECT is not None:
+        objects = OBJECT.split(',')
 
     print('\t > Proposals from which data will be fetched: {}'.format(' '.join(proposals)))
     for i in range(len(proposals)):
         proposals[i] = proposals[i].split()[0]
+    print('\t > Objects in proposals: {}'.format(' '.join(objects)))
+    for i in range(len(objects)):
+        objects[i] = objects[i].split()[0]
     f.close()
 
     #  Create raw folder inside data folder if not existent:
@@ -197,7 +206,7 @@ def download(path_general,sdate,edate,proposalID,datafolder):
                 edate = str(int(c_y) + 1) + '-01-01'
 
             # Download frames in the defined time ranges:
-            nidentified, ndownloaded = download_frames(sdate, edate, headers, prop, datafolder)
+            nidentified, ndownloaded = download_frames(sdate, edate, headers, prop, datafolder, obj)
             if nidentified != 0:
                 print('\t   Final count: ' + str(nidentified) + ' identified frames, downloaded ' +
                       str(ndownloaded) + ' new ones.')
