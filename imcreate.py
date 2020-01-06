@@ -80,7 +80,6 @@ bright_diff(path_general)
 sub(path_general)
 out_save(path_general,'yes','yes')
 
-this is all that is neccessary
 
 --------------------------------------------------------------------
 '''

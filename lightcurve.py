@@ -187,7 +187,8 @@ def data_ext(path_general):
         
         #plot lightcurve
         plt.figure()
-        plt.plot(MJD,flux,'b.',label='Flux')
+        sortidx=np.argsort(MJD)
+        plt.plot(MJD[sortidx],flux[sortidx],'b-',label='Flux')
         #plt.plot(MJD,mag,'m.',label='Magnitude')
         plt.title('Lightcurve for sss17a binary neutron star merger')
         plt.xlabel('Modified Julian date')
